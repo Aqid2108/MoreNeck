@@ -174,6 +174,12 @@ replaced with measured values in bring-up step 5.
   when lean and nod are each within their `rest_tolerance_deg` of rest (lean 0.5°, nod 3°),
   torque off. If rest has not finished within
   `rest_timeout_s` (10 s) — e.g. something is under the head — record a fault and torque off.
+- **Hold at rest (`limp_after_rest: false`, the robot's setting):** when the rest sequence
+  finishes, keep holding the rest pose with torque on (50%) instead of going limp — mode
+  `RESTED`. `look()` is refused until `clear_fault()`; only uncontrollable faults go limp.
+  Shutdown (`close()`) also ends holding, so servo power must be cut to make the neck limp.
+  *Why (hardware, 2026-09-25):* limp, the head tipped forward ~75° on lean even with lean on its
+  stop whenever nod was not fully on its back stop. Interim until the rest pose is proven stable.
 - **While limp:** torque-off is re-sent every tick (it is an unacknowledged broadcast).
 - **Startup goal check:** after writing goal = present, read the goal registers back and only
   enable torque once they match (up to 3 attempts, else `BusError`).

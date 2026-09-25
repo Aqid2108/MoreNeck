@@ -17,6 +17,7 @@ soft_hold_timeout_s: 1.0
 rest_speed_deg_s: 15.0
 rest_torque_fraction: 0.5
 rest_timeout_s: 10.0
+limp_after_rest: false
 joints:
   turn:
     id: 4
@@ -54,7 +55,7 @@ joints:
     raw_max: 1499
     neutral: 824
     rest: 806
-    rest_tolerance_deg: 0.5
+    rest_tolerance_deg: 1.0
     direction: 1
     max_speed: 20.0
     max_accel: 150.0

@@ -61,6 +61,7 @@ class NeckConfig:
     rest_speed_deg_s: float
     rest_torque_fraction: float
     rest_timeout_s: float
+    limp_after_rest: bool
     joints: dict[str, JointConfig]
 
 

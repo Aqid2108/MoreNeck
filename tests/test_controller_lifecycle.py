@@ -91,3 +91,13 @@ def test_repeated_tick_exceptions_record_a_single_fault(cfg):
         ctrl._safe_tick()
     assert ctrl.mode == Mode.LIMP
     assert len(ctrl.faults) == 1
+
+
+def test_close_leaves_head_held_at_rest_when_configured(make_cfg):
+    cfg = make_cfg({"limp_after_rest": False})
+    ctrl, bus, _ = make(cfg)
+    ctrl.start(run_thread=False)
+    ctrl.close()
+    assert ctrl.mode == Mode.RESTED
+    assert bus.torque_log[-1] is True
+    assert not bus.opened

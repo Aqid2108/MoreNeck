@@ -222,3 +222,54 @@ def test_new_soft_fault_after_latch_is_recorded_once(cfg):
     run(ctrl, clock, 0.5)
     assert len(ctrl.faults) == 2
     assert any("temperature" in r for r in ctrl.faults[-1].reasons)
+
+
+def test_rest_is_not_done_until_nod_is_fully_back(cfg):
+    # Drill B again: lean was on its stop but nod stopped ~2 deg short of its back stop; limp let
+    # the head's weight sit in front of the lean axis and it tipped forward 75 deg.
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 1.2)
+    assert ctrl.mode == Mode.RESTING
+    bus.servos["nod"].position = cfg.joints["nod"].rest - 23
+    bus.servos["nod"].jammed = True
+    run(ctrl, clock, 3.0)
+    assert abs(bus.servos["lean"].position - cfg.joints["lean"].rest) <= 2
+    assert ctrl.mode == Mode.RESTING
+
+
+def make_holding(make_cfg):
+    cfg = make_cfg({"limp_after_rest": False})
+    return (cfg, *make(cfg))
+
+
+def test_rest_can_end_holding_the_rest_pose_instead_of_limp(make_cfg):
+    cfg, ctrl, bus, clock = make_holding(make_cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 5.0)
+    assert ctrl.mode == Mode.RESTED
+    assert all(s.torque for s in bus.servos.values())    # held: the head cannot droop forward
+    assert bus.torque_limit_log[-1] == 0.5
+    for name in ("lean", "nod"):
+        assert abs(bus.servos[name].position - cfg.joints[name].rest) <= 6
+    assert ctrl.look(turn=10) is False
+
+
+def test_uncontrollable_fault_while_rested_goes_limp(make_cfg):
+    cfg, ctrl, bus, clock = make_holding(make_cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 5.0)
+    assert ctrl.mode == Mode.RESTED
+    bus.servos["turn"].responding = False
+    run(ctrl, clock, 0.2)
+    assert ctrl.mode == Mode.LIMP
+
+
+def test_clear_fault_from_rested_resumes(make_cfg):
+    cfg, ctrl, bus, clock = make_holding(make_cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 5.0)
+    bus.servos["nod"].current_ma = 100.0
+    ctrl.clear_fault()
+    assert ctrl.mode == Mode.RUNNING
+    assert ctrl.look(turn=10) is True

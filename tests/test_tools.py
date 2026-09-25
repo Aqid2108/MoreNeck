@@ -14,7 +14,7 @@ def test_derive_joint_negative_direction_and_high_rest():
     j = derive_joint("nod", neutral_raw=2939, positive_raw=2850, seen_min=2721, seen_max=3156,
                      limp_raw=3154)
     assert j["direction"] == -1
-    assert j["rest"] == 3133
+    assert j["rest"] == 3154          # where nod settles limp, on its back stop
 
 
 def test_derive_joint_turn_rests_at_neutral():

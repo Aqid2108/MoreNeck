@@ -23,11 +23,11 @@ BASE = {
     "spike_ticks": 3, "fault_debounce_ticks": 3, "hold_window_s": 2.0, "hard_misses": 5,
     "soft_limit_margin_deg": 2.0, "soft_hold_timeout_s": 1.0,
     "rest_speed_deg_s": 15.0, "rest_torque_fraction": 0.5,
-    "rest_timeout_s": 10.0,
+    "rest_timeout_s": 10.0, "limp_after_rest": True,
     "joints": {
         "turn": _joint(4, 1873, 2918, 2286, 2286, 120.0, 400.0),
-        "nod": _joint(3, 2744, 3133, 2939, 3133, 90.0, 300.0),
-        "lean": _joint(1, 824, 1043, 934, 806, 45.0, 150.0, rest_tolerance_deg=0.5),
+        "nod": _joint(3, 2744, 3133, 2939, 3150, 90.0, 300.0, rest_tolerance_deg=0.5),
+        "lean": _joint(1, 824, 1043, 934, 806, 45.0, 150.0, rest_tolerance_deg=1.0),
     },
 }
 

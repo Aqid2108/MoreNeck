@@ -83,4 +83,5 @@ def test_rest_may_sit_outside_soft_limits(cfg):
     # Lean is only stable limp on its back stop, which is outside the soft range look() may use.
     lean = cfg.joints["lean"]
     assert lean.rest < lean.raw_min
-    assert lean.rest_tolerance_deg == 0.5
+    assert lean.rest_tolerance_deg == 1.0
+    assert cfg.joints["nod"].rest > cfg.joints["nod"].raw_max

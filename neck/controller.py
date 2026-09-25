@@ -25,6 +25,7 @@ class Mode(str, Enum):
     IDLE = "idle"        # not started, or closed
     RUNNING = "running"  # torque on, following targets
     RESTING = "resting"  # lowering to the rest pose at reduced speed/torque
+    RESTED = "rested"    # holding the rest pose with torque on (limp_after_rest: false)
     LIMP = "limp"        # torque off
 
 
@@ -147,7 +148,7 @@ class NeckController:
 
     def rest(self, timeout: float = 10.0) -> None:
         with self._lock:
-            if self.mode in (Mode.IDLE, Mode.LIMP):
+            if self.mode in (Mode.IDLE, Mode.LIMP, Mode.RESTED):
                 return
             if self.mode == Mode.RUNNING:
                 self._begin_rest()
@@ -226,11 +227,15 @@ class NeckController:
                 self._fault(Verdict(Level.SOFT, [f"SOFT: rest did not finish within "
                                                  f"{self.cfg.rest_timeout_s:.0f} s"]), readings, now)
                 self._go_limp()
-            if self.mode in (Mode.RUNNING, Mode.RESTING):
+            if self.mode in (Mode.RUNNING, Mode.RESTING, Mode.RESTED):
                 self._step_motion(1 / self.cfg.loop_hz)
                 self.bus.write_goals({n: int(round(sp)) for n, sp in self.setpoints.items()})
                 if self.mode == Mode.RESTING and self._rest_done(readings):
-                    self._go_limp()
+                    if self.cfg.limp_after_rest:
+                        self._go_limp()
+                    else:
+                        # Keep holding: limp, the head can tip forward on lean (hardware).
+                        self.mode = Mode.RESTED
             if self.on_tick:
                 self.on_tick(now, readings, dict(self.setpoints), holding)
 
@@ -240,6 +245,12 @@ class NeckController:
         if verdict.level == Level.WARN and verdict.reasons != self._last_warn:
             log.warning("; ".join(verdict.reasons))
         self._last_warn = verdict.reasons if verdict.level == Level.WARN else None
+
+        if self.mode == Mode.RESTED:
+            if verdict.limp:
+                self._fault(verdict, readings, now)
+                self._go_limp()
+            return
 
         if self.mode == Mode.RESTING:
             if verdict.limp:
