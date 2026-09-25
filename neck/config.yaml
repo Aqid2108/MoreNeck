@@ -40,7 +40,7 @@ joints:
     neutral: 3122
     rest: 3122
     direction: -1
-    max_speed: 90.0
+    max_speed: 30.0
     max_accel: 300.0
     current_limit_ma: 800
     hold_current_limit_ma: 800
@@ -54,7 +54,7 @@ joints:
     neutral: 824
     rest: 824
     direction: 1
-    max_speed: 45.0
+    max_speed: 20.0
     max_accel: 150.0
     current_limit_ma: 800
     hold_current_limit_ma: 800
