@@ -74,3 +74,14 @@ def test_ticklog_records_one_row_per_answering_joint_and_saves(tmp_path):
     path = log.save(tmp_path / "ticks.csv")
     saved = list(csv.DictReader(path.open()))
     assert saved[0]["mode"] == "resting" and saved[0]["current_ma"] == "604.5"
+
+
+@pytest.mark.parametrize("script", ["tools/neck_shell.py", "tools/log_current.py"])
+def test_tool_scripts_start_when_run_directly(script):
+    # Answering "n" at the safety prompt exits before any bus access.
+    import subprocess
+    import sys
+
+    result = subprocess.run([sys.executable, script], input="n\n", capture_output=True, text=True,
+                            timeout=30)
+    assert result.returncode == 0, result.stderr

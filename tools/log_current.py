@@ -11,10 +11,15 @@ import time
 from collections import deque
 from pathlib import Path
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, for `tools.*` when run as a script
+
 from neck.bus import ServoBus
 from neck.config import load_config
 from neck.controller import NeckController
-from tools.ticklog import TickLog
+from tools.ticklog import TickLog  # noqa: E402
 
 
 def summarize(rows, hold_window_s):
