@@ -54,7 +54,7 @@ def make_cfg():
 
 
 PBASE = {
-    "camera_usb_id": "0C45:6366", "camera_name": "Webcam", "camera_index_fallback": 0,
+    "camera_usb_id": "0C45:6366", "camera_name": "Webcam", "camera_index_fallback": None,
     "width": 1280, "height": 720, "rotate": 0, "hfov_deg": 60.0,
     "model": "data/models/yolo11n-pose.pt", "imgsz": 640,
     "person_score_min": 0.4, "keypoint_conf_min": 0.5,

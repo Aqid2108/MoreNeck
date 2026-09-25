@@ -11,16 +11,17 @@ def focal_px(width: int, hfov_deg: float) -> float:
     return (width / 2) / math.tan(math.radians(hfov_deg) / 2)
 
 
-def pixel_to_angles(x: float, y: float, width: int, height: int, hfov_deg: float) -> tuple[float, float]:
-    f = focal_px(width, hfov_deg)
+def pixel_to_angles(x: float, y: float, width: int, height: int, hfov_deg: float,
+                    f_px: float | None = None) -> tuple[float, float]:
+    f = f_px or focal_px(width, hfov_deg)
     yaw = math.degrees(math.atan((width / 2 - x) / f))
     pitch = math.degrees(math.atan((height / 2 - y) / f))
     return yaw, pitch
 
 
 def angles_to_pixel(yaw_deg: float, pitch_deg: float, width: int, height: int,
-                    hfov_deg: float) -> tuple[float, float]:
-    f = focal_px(width, hfov_deg)
+                    hfov_deg: float, f_px: float | None = None) -> tuple[float, float]:
+    f = f_px or focal_px(width, hfov_deg)
     return (width / 2 - f * math.tan(math.radians(yaw_deg)),
             height / 2 - f * math.tan(math.radians(pitch_deg)))
 

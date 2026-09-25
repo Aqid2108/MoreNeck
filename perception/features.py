@@ -87,7 +87,9 @@ class FeatureExtractor:
 
     def people(self, tracks, t: float, frame_size, pose=None) -> tuple[Person, ...]:
         width, height = frame_size
-        f = focal_px(width, self.cfg.hfov_deg)
+        # hfov is the sensor's horizontal FOV; after a 90/270 rotation the sensor width is the image height.
+        sensor_width = height if self.cfg.rotate in (90, 270) else width
+        f = focal_px(sensor_width, self.cfg.hfov_deg)
         conf = self.cfg.keypoint_conf_min
         out = []
         for tr in tracks:
@@ -96,10 +98,14 @@ class FeatureExtractor:
             if not tr.visible:   # coasting: move the head with the predicted box
                 hx += ((tr.box[0] + tr.box[2]) - (tr.last_box[0] + tr.last_box[2])) / 2
                 hy += ((tr.box[1] + tr.box[3]) - (tr.last_box[1] + tr.last_box[3])) / 2
-            yaw, pitch = pixel_to_angles(hx, hy, width, height, self.cfg.hfov_deg)
+            yaw, pitch = pixel_to_angles(hx, hy, width, height, self.cfg.hfov_deg, f_px=f)
             world = pose[0] + yaw if pose is not None else None
             score = facing_score(det, conf)
-            st = self._state.setdefault(tr.id, {"dist": None, "src": None, "hist": deque()})
+            st = self._state.setdefault(tr.id, {"dist": None, "src": None, "hist": deque(), "kind": None})
+            kind = "world" if world is not None else "camera"
+            if st["kind"] != kind:          # never regress world yaw against camera yaw
+                st["hist"].clear()
+                st["kind"] = kind
             if tr.visible:
                 d, src = estimate_distance(det, frame_size, f, score, self.cfg)
                 if d is not None:

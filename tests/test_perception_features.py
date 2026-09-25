@@ -142,3 +142,21 @@ def test_state_is_dropped_for_tracks_that_disappear(pcfg):
     fx.people([track(frontal(), id_=7)], 0.0, (1280, 720))
     fx.people([], 0.1, (1280, 720))
     assert fx._state == {}
+
+
+def test_rotated_camera_uses_sensor_width_for_focal_length(make_pcfg):
+    cfg = make_pcfg({"rotate": 90})      # 1280x720 sensor, image delivered as 720 wide x 1280 tall
+    fx = FeatureExtractor(cfg)
+    det = Detection(box=(0, 500, 60, 900), score=0.9, keypoints={"nose": (0, 600, 0.9)})
+    (p,) = fx.people([track(det)], 0.0, (720, 1280))
+    assert p.head_deg[0] == pytest.approx(np.degrees(np.arctan(360 / F)), abs=0.05)   # ~18.0, not 30
+
+
+def test_pose_dropout_does_not_fake_passing(pcfg):
+    # Static person, neck held at 40 deg, pose provider stops answering part-way.
+    fx = FeatureExtractor(pcfg)
+    for i in range(31):
+        t = i / 30
+        pose = (40.0, 0.0) if t < 0.67 else None
+        (p,) = fx.people([track(frontal(), t=t)], t, (1280, 720), pose=pose)
+    assert p.motion in ("still", "unknown")

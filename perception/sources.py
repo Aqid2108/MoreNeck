@@ -94,13 +94,14 @@ class VideoFileSource:
 class CameraSource:
     """Live camera. A reader thread keeps only the newest frame, so consumers never see a backlog."""
 
-    def __init__(self, usb_id: str = "0C45:6366", name: str = "Webcam", index_fallback: int = 0,
+    def __init__(self, usb_id: str = "0C45:6366", name: str = "Webcam", index_fallback: int | None = None,
                  width: int = 1280, height: int = 720, rotate: int = 0,
-                 capture_factory=cv2.VideoCapture, find=find_camera, clock=time.monotonic):
+                 capture_factory=cv2.VideoCapture, find=find_camera, clock=time.monotonic,
+                 join_timeout_s: float = 1.0):
         self.usb_id, self.name, self.index_fallback = usb_id, name, index_fallback
         self.width, self.height, self.rotate = width, height, rotate
         self._factory, self._find, self.clock = capture_factory, find, clock
-        self._cap = None
+        self.join_timeout_s = join_timeout_s
         self._lock = threading.Lock()
         self._latest: Frame | None = None
         self._delivered: Frame | None = None
@@ -115,28 +116,39 @@ class CameraSource:
     def open(self) -> None:
         index = self._find(self.usb_id, self.name)
         if index is None:
-            log.warning("camera %s / %r not found; trying index %d", self.usb_id, self.name,
-                        self.index_fallback)
+            if self.index_fallback is None:
+                # Never guess: index 0 is usually a camera that doesn't move with the head.
+                raise CameraError(f"camera {self.usb_id} / {self.name!r} not found")
+            log.warning("camera %s / %r not found; using configured index %d", self.usb_id,
+                        self.name, self.index_fallback)
             index = self.index_fallback
         cap = self._factory(index)
         if not cap.isOpened():
+            cap.release()
             raise CameraError(f"could not open camera at index {index}")
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        self._cap = cap
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._reader, name="camera-reader", daemon=True)
+        # Each reader owns its capture and stop event, so a reader that is still blocked in read()
+        # after close() can neither be released under nor touch a later reader's capture.
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._reader, args=(cap, self._stop),
+                                        name="camera-reader", daemon=True)
         self._thread.start()
 
-    def _reader(self) -> None:
-        while not self._stop.is_set():
-            ok, img = self._cap.read()
-            if not ok:
-                time.sleep(0.01)
-                continue
-            frame = Frame(rotate_image(img, self.rotate), self.clock())
-            with self._lock:
-                self._latest = frame
+    def _reader(self, cap, stop: threading.Event) -> None:
+        try:
+            while not stop.is_set():
+                ok, img = cap.read()
+                if stop.is_set():
+                    break
+                if not ok:
+                    time.sleep(0.01)
+                    continue
+                frame = Frame(rotate_image(img, self.rotate), self.clock())
+                with self._lock:
+                    self._latest = frame
+        finally:
+            cap.release()
 
     def read(self) -> Frame | None:
         with self._lock:
@@ -147,11 +159,11 @@ class CameraSource:
         return frame
 
     def close(self) -> None:
-        self._stop.set()
+        self._stop.set()                 # the reader releases its own capture when read() returns
         if self._thread is not None:
-            self._thread.join(timeout=1.0)
+            self._thread.join(timeout=self.join_timeout_s)
+            if self._thread.is_alive():
+                log.warning("camera reader still blocked in read(); it will release on return")
             self._thread = None
-        if self._cap is not None:
-            self._cap.release()
-            self._cap = None
-        self._latest = self._delivered = None
+        with self._lock:
+            self._latest = self._delivered = None

@@ -155,3 +155,13 @@ def test_threaded_start_and_stop(pcfg):
         time.sleep(0.2)
         assert p.latest().source_ok
     assert src.closes == 1
+
+
+def test_neck_pose_is_sampled_before_inference(pcfg):
+    p, _, det, clock, _ = make(pcfg)
+    order = []
+    original = det.detect
+    det.detect = lambda image: order.append("detect") or original(image)
+    p.pose_provider = lambda: order.append("pose") or (0.0, 0.0)
+    run(p, clock, 2)
+    assert order == ["pose", "detect", "pose", "detect"]

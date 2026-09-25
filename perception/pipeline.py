@@ -92,18 +92,18 @@ class Perception:
             return None
         self._last_frame_at = now
         height, width = frame.image.shape[:2]
+        pose = None                      # sampled before inference, as close to capture as we can
+        if self.pose_provider is not None:
+            try:
+                pose = self.pose_provider()
+            except Exception as exc:
+                log.warning("pose provider failed: %r", exc)
         try:
             detections = self.detector.detect(frame.image)
         except Exception as exc:
             self._fail(frame.time, f"detector error: {exc!r}")
             return self.latest()
         tracks = self.tracker.update(detections, frame.time)
-        pose = None
-        if self.pose_provider is not None:
-            try:
-                pose = self.pose_provider()
-            except Exception as exc:
-                log.warning("pose provider failed: %r", exc)
         people = self.features.people(tracks, frame.time, (width, height), pose)
         if self._failing:
             log.info("perception recovered")

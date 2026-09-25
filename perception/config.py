@@ -14,7 +14,7 @@ DEFAULT_CONFIG = Path(__file__).with_name("config.yaml")
 class PerceptionConfig:
     camera_usb_id: str
     camera_name: str
-    camera_index_fallback: int
+    camera_index_fallback: int | None
     width: int
     height: int
     rotate: int
@@ -43,6 +43,8 @@ def _validate(c: PerceptionConfig) -> None:
     checks = [
         (re.fullmatch(r"[0-9A-Fa-f]{4}:[0-9A-Fa-f]{4}", c.camera_usb_id) is not None,
          "camera_usb_id must look like 0C45:6366"),
+        (c.camera_index_fallback is None or c.camera_index_fallback >= 0,
+         "camera_index_fallback must be null or a non-negative index"),
         (c.width > 0 and c.height > 0, "width and height must be positive"),
         (c.rotate in (0, 90, 180, 270), "rotate must be 0, 90, 180 or 270"),
         (10 <= c.hfov_deg <= 170, "hfov_deg must be between 10 and 170"),

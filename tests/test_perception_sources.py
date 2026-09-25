@@ -105,3 +105,48 @@ def test_camera_source_falls_back_to_index_and_reports_failure():
                        find=lambda usb, name: None)
     with pytest.raises(CameraError, match="index 3"):
         src.open()
+
+
+def test_missing_head_camera_is_an_error_without_an_explicit_fallback():
+    # Index 0 on this Mac is the MacBook or iPhone camera, which does not move with the head.
+    src = CameraSource(index_fallback=None, capture_factory=lambda i: FakeCapture(i),
+                       find=lambda usb, name: None)
+    with pytest.raises(CameraError, match="not found"):
+        src.open()
+
+
+class SlowCapture(FakeCapture):
+    """read() blocks like AVFoundation after an unplug; records a release that happens mid-read."""
+
+    def __init__(self, index):
+        super().__init__(index)
+        self.reading = False
+        self.released_mid_read = False
+
+    def read(self):
+        self.reading = True
+        time.sleep(0.3)
+        self.reading = False
+        self.count += 1
+        return True, np.zeros((48, 64, 3), dtype=np.uint8)
+
+    def release(self):
+        if self.reading:
+            self.released_mid_read = True
+        self.released = True
+
+
+def test_close_never_releases_a_capture_mid_read_and_reopen_is_isolated():
+    caps = []
+    src = CameraSource(capture_factory=lambda i: caps.append(SlowCapture(i)) or caps[-1],
+                       find=lambda usb, name: 1, join_timeout_s=0.05)
+    src.open()
+    time.sleep(0.05)                     # reader is now blocked inside read()
+    src.close()                          # join times out
+    src.open()                           # reopen straight away
+    time.sleep(0.8)
+    src.close()
+    time.sleep(0.5)
+    assert not caps[0].released_mid_read
+    assert caps[0].released
+    assert caps[0].count == 1            # the old reader never touched the capture again

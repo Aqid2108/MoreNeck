@@ -51,3 +51,7 @@ def test_contract_types_are_immutable():
     assert "nose" in KEYPOINT_NAMES and det.keypoints["nose"][2] == 0.9
     with pytest.raises(AttributeError):
         snap.people = ()
+
+
+def test_index_fallback_is_off_unless_configured():
+    assert load_config(DEFAULT_CONFIG).camera_index_fallback is None
