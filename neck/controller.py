@@ -1,0 +1,289 @@
+"""NeckController: the 50 Hz loop that owns the servo bus.
+
+Only this module drives ServoBus. Callers (perception, behavior, tools) use
+look(), rest(), clear_fault(), close(), state and faults.
+"""
+from __future__ import annotations
+
+import atexit
+import logging
+import math
+import threading
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+
+from neck.bus import BusError
+from neck.config import DEG_PER_COUNT
+from neck.motion import step_axis
+from neck.safety import Level, Verdict, check, new_history
+
+log = logging.getLogger("neck.controller")
+
+
+class Mode(str, Enum):
+    IDLE = "idle"        # not started, or closed
+    RUNNING = "running"  # torque on, following targets
+    RESTING = "resting"  # lowering to the rest pose at reduced speed/torque
+    LIMP = "limp"        # torque off
+
+
+@dataclass
+class Fault:
+    time: float
+    level: Level
+    reasons: list[str]
+    readings: dict = field(repr=False)
+
+
+class NeckController:
+    def __init__(self, cfg, bus, clock=time.monotonic, sleep=time.sleep, on_tick=None):
+        self.cfg = cfg
+        self.bus = bus
+        self.clock = clock
+        self._sleep = sleep
+        self.on_tick = on_tick
+        self._lock = threading.RLock()
+        self.mode = Mode.IDLE
+        self.latched: Fault | None = None
+        self.faults: list[Fault] = []
+        self.readings: dict = {}
+        self.setpoints: dict[str, float] = {}
+        self.velocities: dict[str, float] = {}
+        self.targets: dict[str, float] = {}
+        self._history = new_history(cfg)
+        self._soft_since: float | None = None
+        self._rest_speed: float | None = None
+        self._last_warn: list[str] | None = None
+        self._opened = False
+        self._closed = False
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+
+    # ---- lifecycle -------------------------------------------------------
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+    def start(self, run_thread: bool = True) -> None:
+        self.bus.open()
+        self._opened = True
+        self._startup()
+        atexit.register(self.close)
+        if run_thread:
+            self._thread = threading.Thread(target=self._run, name="neck-loop", daemon=True)
+            self._thread.start()
+
+    def _startup(self) -> None:
+        with self._lock:
+            readings = self.bus.read_all()
+            missing = sorted(n for n, r in readings.items() if r is None)
+            if missing:
+                raise BusError(f"servos not responding: {', '.join(missing)}")
+            present = {n: r.position for n, r in readings.items()}
+            self.bus.write_goals(present)          # goal = present BEFORE torque on: no jump
+            self.bus.configure_for_streaming()
+            self.bus.set_torque_limit(1.0)
+            self.bus.set_torque(True)
+            self.readings = readings
+            self.setpoints = {n: float(p) for n, p in present.items()}
+            self.velocities = {n: 0.0 for n in present}
+            self.targets = {n: float(j.neutral) for n, j in self.cfg.joints.items()}
+            self._history = new_history(self.cfg)
+            self._soft_since = None
+            self._rest_speed = None
+            self.mode = Mode.RUNNING
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        atexit.unregister(self.close)
+        try:
+            if self.mode in (Mode.RUNNING, Mode.RESTING):
+                self.rest()
+        finally:
+            self._stop.set()
+            if self._thread is not None:
+                self._thread.join(timeout=1.0)
+            if self._opened:
+                self.bus.close()
+
+    # ---- public commands -------------------------------------------------
+
+    def look(self, turn: float = 0.0, nod: float = 0.0, lean: float = 0.0) -> bool:
+        angles = {"turn": turn, "nod": nod, "lean": lean}
+        if not all(math.isfinite(a) for a in angles.values()):
+            log.warning("look() ignored non-finite angles %s", angles)
+            return False
+        with self._lock:
+            if self.mode != Mode.RUNNING or self.latched is not None:
+                return False
+            for name, deg in angles.items():
+                jc = self.cfg.joints[name]
+                self.targets[name] = jc.clamp_raw(jc.to_raw(deg))
+        return True
+
+    def rest(self, timeout: float = 10.0) -> None:
+        with self._lock:
+            if self.mode in (Mode.IDLE, Mode.LIMP):
+                return
+            if self.mode == Mode.RUNNING:
+                self._begin_rest()
+        start = self.clock()
+        threaded = self._thread is not None and self._thread.is_alive()
+        while self.mode == Mode.RESTING:
+            if self.clock() - start > timeout:
+                log.error("rest did not finish within %.1f s; going limp", timeout)
+                with self._lock:
+                    self._go_limp()
+                break
+            self._sleep(1 / self.cfg.loop_hz)
+            if not threaded:
+                self.tick()
+
+    def clear_fault(self) -> None:
+        with self._lock:
+            self.latched = None
+            self._startup()
+
+    @property
+    def state(self) -> dict:
+        with self._lock:
+            return {
+                "mode": self.mode,
+                "latched": self.latched,
+                "readings": dict(self.readings),
+                "setpoints": dict(self.setpoints),
+                "targets": dict(self.targets),
+            }
+
+    # ---- loop ------------------------------------------------------------
+
+    def _run(self) -> None:
+        period = 1 / self.cfg.loop_hz
+        next_t = time.monotonic()
+        while not self._stop.is_set():
+            self._safe_tick()
+            next_t += period
+            delay = next_t - time.monotonic()
+            if delay > 0:
+                self._stop.wait(delay)
+            else:
+                next_t = time.monotonic()
+
+    def _safe_tick(self) -> None:
+        try:
+            self.tick()
+        except Exception as exc:
+            log.exception("tick failed")
+            with self._lock:
+                self._fault(Verdict(Level.HARD, [f"HARD: controller exception: {exc!r}"]),
+                            self.readings, self.clock())
+                self._go_limp()
+
+    def tick(self) -> None:
+        with self._lock:
+            if self.mode == Mode.IDLE:
+                return
+            now = self.clock()
+            readings = self.bus.read_all()
+            self.readings = readings
+            holding = {n: self.velocities.get(n, 0.0) == 0.0
+                       and self.setpoints.get(n) == self.targets.get(n) for n in self.cfg.joints}
+            if self.mode != Mode.LIMP:
+                verdict = check(readings, self.setpoints, holding, self.cfg, self._history, now)
+                self._handle(verdict, readings, now)
+            if self.mode in (Mode.RUNNING, Mode.RESTING):
+                self._step_motion(1 / self.cfg.loop_hz)
+                self.bus.write_goals({n: int(round(sp)) for n, sp in self.setpoints.items()})
+                if self.mode == Mode.RESTING and self._rest_done(readings):
+                    self._go_limp()
+            if self.on_tick:
+                self.on_tick(now, readings, dict(self.setpoints), holding)
+
+    # ---- internals (call with lock held) -----------------------------------
+
+    def _handle(self, verdict: Verdict, readings: dict, now: float) -> None:
+        if verdict.level == Level.WARN and verdict.reasons != self._last_warn:
+            log.warning("; ".join(verdict.reasons))
+        self._last_warn = verdict.reasons if verdict.level == Level.WARN else None
+
+        if self.mode == Mode.RESTING:
+            if verdict.level == Level.HARD:
+                self._fault(verdict, readings, now)
+                self._go_limp()
+            return
+
+        if verdict.level == Level.HARD or (verdict.level == Level.SOFT and self._near_rest(readings)):
+            self._fault(verdict, readings, now)
+            self._go_limp()
+        elif verdict.level == Level.SOFT:
+            if self.latched is None:
+                self._fault(verdict, readings, now)
+                self._hold(readings)
+                self._soft_since = now
+            elif self._soft_since is None:
+                self._soft_since = now
+            elif now - self._soft_since >= self.cfg.soft_hold_timeout_s:
+                log.error("SOFT fault persisted %.1f s; resting", now - self._soft_since)
+                self._begin_rest()
+        else:
+            self._soft_since = None
+
+    def _fault(self, verdict: Verdict, readings: dict, now: float) -> None:
+        fault = Fault(time=now, level=verdict.level, reasons=list(verdict.reasons), readings=dict(readings))
+        self.faults.append(fault)
+        if self.latched is None:
+            self.latched = fault
+        log.error("fault %s: %s", verdict.level.name, "; ".join(verdict.reasons))
+
+    def _hold(self, readings: dict) -> None:
+        for name, r in readings.items():
+            if r is not None:
+                self.setpoints[name] = float(r.position)
+                self.targets[name] = float(r.position)
+            self.velocities[name] = 0.0
+
+    def _near_rest(self, readings: dict) -> bool:
+        for name in ("lean", "nod"):
+            r = readings.get(name)
+            if r is None:
+                return False
+            if abs(r.position - self.cfg.joints[name].rest) * DEG_PER_COUNT > self.cfg.near_rest_deg:
+                return False
+        return True
+
+    def _rest_done(self, readings: dict) -> bool:
+        for name in ("lean", "nod"):
+            r = readings.get(name)
+            if r is None:
+                return False
+            if abs(r.position - self.cfg.joints[name].rest) * DEG_PER_COUNT > self.cfg.rest_done_within_deg:
+                return False
+        return True
+
+    def _begin_rest(self) -> None:
+        self.targets = {n: float(j.rest) for n, j in self.cfg.joints.items()}
+        self._rest_speed = self.cfg.rest_speed_deg_s
+        self.bus.set_torque_limit(self.cfg.rest_torque_fraction)
+        self.mode = Mode.RESTING
+
+    def _go_limp(self) -> None:
+        try:
+            self.bus.set_torque(False)
+        except Exception:
+            log.exception("torque off failed")
+        self.velocities = {n: 0.0 for n in self.cfg.joints}
+        self.mode = Mode.LIMP
+
+    def _step_motion(self, dt: float) -> None:
+        for name, jc in self.cfg.joints.items():
+            vmax = jc.max_speed if self._rest_speed is None else min(jc.max_speed, self._rest_speed)
+            self.setpoints[name], self.velocities[name] = step_axis(
+                self.setpoints[name], self.velocities[name], self.targets[name],
+                vmax / DEG_PER_COUNT, jc.max_accel / DEG_PER_COUNT, dt)
