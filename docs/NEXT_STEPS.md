@@ -67,3 +67,21 @@ Questions for the brainstorm:
 6. Are the ESP32 eye displays part of this phase?
 
 Suggested order when resuming: A.1–A.2 (15 min at the robot) → B turn cable → C brainstorm.
+
+## D. Perception (sub-project 3) — status 2026-09-26
+
+Branch `perception` (not merged). Spec `docs/superpowers/specs/2026-09-26-perception-design.md`,
+plan `docs/superpowers/plans/2026-09-26-perception.md`, ledger
+`.superpowers/sdd/2026-09-26-perception/progress.md`. 174 offline tests pass; independent review
+done and its 5 fixable Important findings fixed.
+
+Still to do (needs the user's OK or the hardware):
+1. **Install Ultralytics + PyTorch (~1 GB)** and **download `yolo11n-pose.pt` (~6 MB)** → plan Task 7
+   Steps 5–7; then add an MPS-vs-CPU keypoint agreement check (review I-7; default to CPU if MPS is off).
+2. **Public data** (plan Task 9 Steps 3–5): 2–3 Pexels indoor videos, MOT17 (~5.5 GB) → run
+   `tools/eval_perception.py`, record fps / p95 latency / ID switches here.
+3. **Camera** (hardware): `pytest -m camera`, `tools/perception_view.py`; set `rotate` if the image is
+   sideways; calibrate `hfov_deg` with the neck (`geometry.hfov_from_shift`).
+4. **For the behavior spec:** publish timestamped neck poses so perception can (a) interpolate the pose
+   to frame capture time and (b) compensate the tracker for head rotation (review I-4/I-6).
+5. 14 deferred minor review items are listed in the ledger (`Final: minor (deferred)` lines).
