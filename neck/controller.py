@@ -203,7 +203,7 @@ class NeckController:
                     return
             log.exception("tick failed")
             with self._lock:
-                self._fault(Verdict(Level.HARD, [f"HARD: controller exception: {exc!r}"]),
+                self._fault(Verdict(Level.HARD, [f"HARD: controller exception: {exc!r}"], limp=True),
                             self.readings, self.clock())
                 self._go_limp()
 
@@ -242,14 +242,23 @@ class NeckController:
         self._last_warn = verdict.reasons if verdict.level == Level.WARN else None
 
         if self.mode == Mode.RESTING:
-            if verdict.level == Level.HARD:
+            if verdict.limp:
                 self._fault(verdict, readings, now)
                 self._go_limp()
+            elif verdict.level == Level.HARD and \
+                    _reason_keys(verdict.reasons) != _reason_keys(self.faults[-1].reasons if self.faults else []):
+                self._fault(verdict, readings, now)   # record it; keep lowering the head
             return
 
-        if verdict.level == Level.HARD or (verdict.level == Level.SOFT and self._near_rest(readings)):
+        if verdict.limp or (verdict.level >= Level.SOFT and self._near_rest(readings)):
+            # Servos can't be trusted to lower the head, or it is already next to its rest stop.
             self._fault(verdict, readings, now)
             self._go_limp()
+        elif verdict.level == Level.HARD:
+            # Servos still respond: lower the head under control, then go limp. Dropping it from a
+            # raised pose swings it hard enough to knock lean off its rest stop (seen on hardware).
+            self._fault(verdict, readings, now)
+            self._begin_rest()
         elif verdict.level == Level.SOFT:
             if self.latched is None:
                 self._fault(verdict, readings, now)

@@ -52,6 +52,7 @@ class NeckConfig:
     tracking_max_error_deg: float
     tracking_max_duration_s: float
     spike_ticks: int
+    fault_debounce_ticks: int
     hold_window_s: float
     hard_misses: int
     soft_limit_margin_deg: float

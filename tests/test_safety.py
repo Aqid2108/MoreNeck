@@ -13,6 +13,14 @@ def nominal(cfg, **per_joint):
     return {n: reading(**{"position": j.neutral, **per_joint.get(n, {})}) for n, j in cfg.joints.items()}
 
 
+def chk_n(cfg, readings, n=3):
+    """Run the same readings for n consecutive ticks on a fresh history; return the last verdict."""
+    hist = new_history(cfg)
+    for i in range(n):
+        v = chk(cfg, hist, readings, now=i / 50)
+    return v
+
+
 def chk(cfg, hist, readings, now=0.0, setpoints=None, holding=None):
     setpoints = setpoints or {n: float(j.neutral) for n, j in cfg.joints.items()}
     holding = holding or {n: False for n in cfg.joints}
@@ -44,23 +52,46 @@ def test_miss_counter_resets_on_reply(cfg):
     assert chk(cfg, hist, missing).level == Level.WARN
 
 
-def test_status_bits_are_hard(cfg):
-    assert chk(cfg, new_history(cfg), nominal(cfg, nod={"status": 0x20})).level == Level.HARD
+def test_status_bits_are_hard_after_debounce(cfg):
+    assert chk_n(cfg, nominal(cfg, nod={"status": 0x20}), n=2).level == Level.OK
+    assert chk_n(cfg, nominal(cfg, nod={"status": 0x20}), n=3).level == Level.HARD
+
+
+def test_single_sample_temperature_spike_is_ignored(cfg):
+    # Seen on hardware: nod read 28, 82, 28 C on consecutive ticks (a corrupted byte).
+    hist = new_history(cfg)
+    for i, temp in enumerate([28, 82, 28, 28, 28]):
+        assert chk(cfg, hist, nominal(cfg, nod={"temperature": temp}), now=i / 50).level == Level.OK
+
+
+def test_only_uncontrollable_faults_request_limp(cfg):
+    hist = new_history(cfg)
+    lost = nominal(cfg)
+    lost["nod"] = None
+    for i in range(5):
+        v = chk(cfg, hist, lost, now=i / 50)
+    assert v.level == Level.HARD and v.limp
+    over = {n: reading(j.neutral, voltage=8.2) for n, j in cfg.joints.items()}
+    assert chk_n(cfg, over).limp
+    for hot in (nominal(cfg, nod={"temperature": 66}), nominal(cfg, nod={"status": 0x20}),
+                {n: reading(j.neutral, voltage=5.9) for n, j in cfg.joints.items()}):
+        v = chk_n(cfg, hot)
+        assert v.level == Level.HARD and not v.limp
 
 
 def test_voltage_thresholds(cfg):
     for volts, level in [(6.7, Level.WARN), (6.4, Level.SOFT), (5.9, Level.HARD), (8.1, Level.HARD),
                          (7.4, Level.OK)]:
         r = {n: reading(j.neutral, voltage=volts) for n, j in cfg.joints.items()}
-        assert chk(cfg, new_history(cfg), r).level == level, volts
+        assert chk_n(cfg, r).level == level, volts
 
 
 def test_temperature_thresholds_are_per_joint(make_cfg):
     cfg = make_cfg({"nod.temp_warn_c": 50, "nod.temp_soft_c": 55, "nod.temp_hard_c": 60})
-    assert chk(cfg, new_history(cfg), nominal(cfg, nod={"temperature": 52})).level == Level.WARN
-    assert chk(cfg, new_history(cfg), nominal(cfg, nod={"temperature": 56})).level == Level.SOFT
-    assert chk(cfg, new_history(cfg), nominal(cfg, nod={"temperature": 60})).level == Level.HARD
-    assert chk(cfg, new_history(cfg), nominal(cfg, turn={"temperature": 56})).level == Level.WARN
+    assert chk_n(cfg, nominal(cfg, nod={"temperature": 52})).level == Level.WARN
+    assert chk_n(cfg, nominal(cfg, nod={"temperature": 56})).level == Level.SOFT
+    assert chk_n(cfg, nominal(cfg, nod={"temperature": 60})).level == Level.HARD
+    assert chk_n(cfg, nominal(cfg, turn={"temperature": 56})).level == Level.WARN
 
 
 def test_current_spike_needs_three_consecutive_ticks(cfg):
@@ -124,7 +155,7 @@ def test_soft_limit_check_arms_only_after_entering_range(cfg):
 
 def test_most_severe_wins_and_all_reasons_kept(cfg):
     r = nominal(cfg, nod={"temperature": 66, "voltage": 6.4})
-    v = chk(cfg, new_history(cfg), r)
+    v = chk_n(cfg, r)
     assert v.level == Level.HARD
     assert any("temperature" in s for s in v.reasons)
     assert any("voltage" in s for s in v.reasons)

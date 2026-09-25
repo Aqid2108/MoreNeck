@@ -158,7 +158,15 @@ replaced with measured values in bring-up step 5.
 - **WARN:** log only.
 - **SOFT:** latch fault; target := present position (hold). If the condition persists for 1 s,
   run the rest sequence. If it clears, keep holding (fault stays latched until `clear_fault()`).
-- **HARD:** latch fault; torque off on all joints immediately.
+- **HARD, servos still controllable** (over-temperature, low voltage, servo status bits): latch
+  fault and run the rest sequence immediately (no 1 s hold), then go limp.
+- **HARD, servos not controllable** (lost communication, over-voltage, controller exception):
+  latch fault; torque off on all joints immediately.
+- **Debounce:** temperature, voltage and status only count after `fault_debounce_ticks` (3)
+  consecutive samples at that level, so a single corrupted reading cannot fault.
+  *Why (hardware, 2026-09-25):* one tick read nod at 82 °C between 28 °C readings; the old
+  immediate-limp HARD dropped the head from 46° up and the swing knocked lean off its rest stop
+  to its forward end.
 - **Near-rest shortcut:** if lean and nod are both within 5° of their rest positions, any
   SOFT or HARD fault → torque off immediately.
 - **Rest sequence:** torque limit → 50%; targets := rest pose; max speed 15 °/s on all joints;
@@ -201,7 +209,8 @@ about 2286 (−36° / +56°); calibration confirms or corrects that neutral.
 - `test_controller.py` against `FakeBus` (simulated servos follow setpoints with first-order
   lag; injectable jam, dropped replies, temperature rise, voltage sag, status fault):
   no-jump startup; speed/accel limits respected; targets clamped to soft limits;
-  SOFT → hold → rest → limp; HARD → immediate limp; near-rest shortcut; latch and
+  SOFT → hold → rest → limp; controllable HARD → rest → limp; uncontrollable HARD → immediate limp;
+  single-sample spikes ignored; near-rest shortcut; latch and
   `clear_fault()`; `close()` and `KeyboardInterrupt` always rest.
 - `test_bus_parsing.py` — decode recorded group-read packets, including 2-byte current,
   sign-magnitude speed/current, and missing replies.

@@ -9,12 +9,10 @@ from neck.config import (
 from tests.conftest import BASE
 
 
-def test_default_config_file_loads_with_measured_values():
+def test_default_config_file_loads():
     c = load_config(DEFAULT_CONFIG)
+    # Joint limits are rewritten by tools/calibrate.py; check identity and wiring, not values.
     assert {n: j.id for n, j in c.joints.items()} == {"turn": 4, "nod": 3, "lean": 1}
-    assert (c.joints["lean"].raw_min, c.joints["lean"].raw_max) == (824, 1043)
-    assert (c.joints["nod"].raw_min, c.joints["nod"].raw_max) == (2744, 3133)
-    assert (c.joints["turn"].raw_min, c.joints["turn"].raw_max) == (1873, 2918)
     assert c.port_vid == 0x1A86
     assert c.loop_hz == 50
 

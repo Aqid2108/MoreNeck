@@ -9,6 +9,7 @@ voltage_hard_above: 8.0
 tracking_max_error_deg: 8.0
 tracking_max_duration_s: 0.3
 spike_ticks: 3
+fault_debounce_ticks: 3
 hold_window_s: 2.0
 hard_misses: 5
 soft_limit_margin_deg: 2.0

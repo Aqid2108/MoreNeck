@@ -19,9 +19,13 @@ class Level(IntEnum):
 class Verdict:
     level: Level = Level.OK
     reasons: list[str] = field(default_factory=list)
+    limp: bool = False   # True only for HARD faults where the servos can't be trusted to lower the head
 
-    def add(self, level: Level, reason: str) -> None:
+    def add(self, level: Level, reason: str, limp: bool = False) -> None:
+        if level == Level.OK:
+            return
         self.level = max(self.level, level)
+        self.limp = self.limp or limp
         self.reasons.append(f"{level.name}: {reason}")
 
 
@@ -33,6 +37,14 @@ class JointHistory:
     holding_since: float | None = None
     currents: deque = field(default_factory=deque)
     limits_armed: bool = False
+    recent: dict = field(default_factory=dict)   # check name -> deque of recent levels
+
+
+def _debounced(h: JointHistory, key: str, level: Level, ticks: int) -> Level:
+    """Level sustained over the last `ticks` samples: one corrupted reading can't raise a fault."""
+    window = h.recent.setdefault(key, deque(maxlen=ticks))
+    window.append(level)
+    return min(window) if len(window) == ticks else Level.OK
 
 
 def new_history(cfg) -> dict[str, JointHistory]:
@@ -48,28 +60,37 @@ def check(readings, setpoints, holding, cfg, history, now) -> Verdict:
         if r is None:
             h.misses += 1
             if h.misses >= cfg.hard_misses:
-                v.add(Level.HARD, f"{name}: no reply for {h.misses} reads")
+                v.add(Level.HARD, f"{name}: no reply for {h.misses} reads", limp=True)
             else:
                 v.add(Level.WARN, f"{name}: missed read")
             continue
         h.misses = 0
 
-        if r.status:
-            v.add(Level.HARD, f"{name}: servo status fault bits {r.status:#04x}")
+        n = cfg.fault_debounce_ticks
+        status = _debounced(h, "status", Level.HARD if r.status else Level.OK, n)
+        v.add(status, f"{name}: servo status fault bits {r.status:#04x}")
 
-        if r.voltage > cfg.voltage_hard_above or r.voltage < cfg.voltage_hard_below:
-            v.add(Level.HARD, f"{name}: voltage {r.voltage:.1f} V")
+        over = r.voltage > cfg.voltage_hard_above
+        if over or r.voltage < cfg.voltage_hard_below:
+            volt = Level.HARD
         elif r.voltage < cfg.voltage_soft_below:
-            v.add(Level.SOFT, f"{name}: voltage {r.voltage:.1f} V")
+            volt = Level.SOFT
         elif r.voltage < cfg.voltage_warn_below:
-            v.add(Level.WARN, f"{name}: voltage {r.voltage:.1f} V")
+            volt = Level.WARN
+        else:
+            volt = Level.OK
+        volt = _debounced(h, "voltage", volt, n)
+        v.add(volt, f"{name}: voltage {r.voltage:.1f} V", limp=over and volt == Level.HARD)
 
         if r.temperature >= jc.temp_hard_c:
-            v.add(Level.HARD, f"{name}: temperature {r.temperature} C")
+            temp = Level.HARD
         elif r.temperature >= jc.temp_soft_c:
-            v.add(Level.SOFT, f"{name}: temperature {r.temperature} C")
+            temp = Level.SOFT
         elif r.temperature >= jc.temp_warn_c:
-            v.add(Level.WARN, f"{name}: temperature {r.temperature} C")
+            temp = Level.WARN
+        else:
+            temp = Level.OK
+        v.add(_debounced(h, "temperature", temp, n), f"{name}: temperature {r.temperature} C")
 
         h.over_current_ticks = h.over_current_ticks + 1 if r.current_ma > jc.current_limit_ma else 0
         if h.over_current_ticks >= cfg.spike_ticks:
