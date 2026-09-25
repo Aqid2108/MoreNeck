@@ -117,12 +117,29 @@ def test_rest_moves_no_faster_than_rest_speed(cfg):
     assert max(abs(b - a) for a, b in zip(nod, nod[1:])) <= per_tick + 1
 
 
-def test_soft_fault_near_rest_goes_limp_without_resting(cfg):
+def test_fault_near_rest_still_rests_before_going_limp(cfg):
+    # Going limp with lean even slightly off its back stop lets the head fall forward (hardware).
     ctrl, bus, clock = make(cfg, start="rest")
     bus.servos["lean"].current_ma = 2000.0
     run(ctrl, clock, 0.06)
+    assert ctrl.mode == Mode.RUNNING                     # holding, not limp
+    run(ctrl, clock, 3.0)
+    assert 0.5 in bus.torque_limit_log                   # went through the rest sequence
     assert ctrl.mode == Mode.LIMP
-    assert 0.5 not in bus.torque_limit_log
+    assert abs(bus.servos["lean"].position - cfg.joints["lean"].rest) <= 6
+
+
+def test_rest_is_not_done_until_lean_is_on_its_stop(cfg):
+    # Drill B: rest ended with lean 23 counts (2 deg) off its stop; limp then let it fall 72 deg.
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 1.2)
+    assert ctrl.mode == Mode.RESTING
+    bus.servos["lean"].position = cfg.joints["lean"].rest + 23
+    bus.servos["lean"].jammed = True
+    run(ctrl, clock, 3.0)                                # nod reaches its rest well within this
+    assert abs(bus.servos["nod"].position - cfg.joints["nod"].rest) <= 2
+    assert ctrl.mode == Mode.RESTING                     # still trying to get lean onto its stop
 
 
 def test_lost_servo_during_rest_goes_limp(cfg):

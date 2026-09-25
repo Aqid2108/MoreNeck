@@ -250,8 +250,9 @@ class NeckController:
                 self._fault(verdict, readings, now)   # record it; keep lowering the head
             return
 
-        if verdict.limp or (verdict.level >= Level.SOFT and self._near_rest(readings)):
-            # Servos can't be trusted to lower the head, or it is already next to its rest stop.
+        if verdict.limp:
+            # Servos can't be trusted to lower the head. (No near-rest shortcut: going limp with
+            # lean even 2 deg off its back stop lets the head fall 70 deg forward.)
             self._fault(verdict, readings, now)
             self._go_limp()
         elif verdict.level == Level.HARD:
@@ -288,21 +289,13 @@ class NeckController:
                 self.targets[name] = float(r.position)
             self.velocities[name] = 0.0
 
-    def _near_rest(self, readings: dict) -> bool:
-        for name in ("lean", "nod"):
-            r = readings.get(name)
-            if r is None:
-                return False
-            if abs(r.position - self.cfg.joints[name].rest) * DEG_PER_COUNT > self.cfg.near_rest_deg:
-                return False
-        return True
-
     def _rest_done(self, readings: dict) -> bool:
         for name in ("lean", "nod"):
             r = readings.get(name)
             if r is None:
                 return False
-            if abs(r.position - self.cfg.joints[name].rest) * DEG_PER_COUNT > self.cfg.rest_done_within_deg:
+            jc = self.cfg.joints[name]
+            if abs(r.position - jc.rest) * DEG_PER_COUNT > jc.rest_tolerance_deg:
                 return False
         return True
 

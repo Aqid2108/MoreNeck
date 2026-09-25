@@ -37,7 +37,7 @@ def test_clamp_raw(cfg):
     [
         ("lean", "raw_min", 1100, "lean"),          # raw_min >= raw_max
         ("nod", "neutral", 3500, "nod"),            # neutral outside limits
-        ("turn", "rest", 100, "turn"),              # rest outside limits
+        ("turn", "rest", 5000, "turn"),             # rest beyond 4095
         ("turn", "direction", 0, "turn"),           # direction must be +/-1
         ("nod", "id", 1, "id"),                     # duplicate id with lean
         ("lean", "temp_soft_c", 70, "lean"),        # warn < soft < hard violated
@@ -77,3 +77,10 @@ def test_default_config_has_bus_pid_and_rest_timeout():
 def test_loop_hz_must_be_positive(make_cfg):
     with pytest.raises(ValueError, match="loop_hz"):
         make_cfg({"loop_hz": 0})
+
+
+def test_rest_may_sit_outside_soft_limits(cfg):
+    # Lean is only stable limp on its back stop, which is outside the soft range look() may use.
+    lean = cfg.joints["lean"]
+    assert lean.rest < lean.raw_min
+    assert lean.rest_tolerance_deg == 0.5

@@ -20,6 +20,7 @@ class JointConfig:
     raw_max: int
     neutral: int
     rest: int
+    rest_tolerance_deg: float
     direction: int
     max_speed: float
     max_accel: float
@@ -59,8 +60,6 @@ class NeckConfig:
     soft_hold_timeout_s: float
     rest_speed_deg_s: float
     rest_torque_fraction: float
-    rest_done_within_deg: float
-    near_rest_deg: float
     rest_timeout_s: float
     joints: dict[str, JointConfig]
 
@@ -73,8 +72,11 @@ def _validate_joint(j: JointConfig) -> None:
         fail(f"need 0 <= raw_min < raw_max <= 4095, got {j.raw_min}..{j.raw_max}")
     if not (j.raw_min <= j.neutral <= j.raw_max):
         fail(f"neutral {j.neutral} outside {j.raw_min}..{j.raw_max}")
-    if not (j.raw_min <= j.rest <= j.raw_max):
-        fail(f"rest {j.rest} outside {j.raw_min}..{j.raw_max}")
+    # rest may sit outside the soft limits: lean is only stable limp on its back stop.
+    if not (0 <= j.rest <= 4095):
+        fail(f"rest {j.rest} outside 0..4095")
+    if j.rest_tolerance_deg <= 0:
+        fail("rest_tolerance_deg must be positive")
     if j.direction not in (1, -1):
         fail(f"direction must be 1 or -1, got {j.direction}")
     if not (j.temp_warn_c < j.temp_soft_c < j.temp_hard_c):

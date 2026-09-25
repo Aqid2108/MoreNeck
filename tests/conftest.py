@@ -5,9 +5,10 @@ import pytest
 from neck.config import config_from_dict
 
 
-def _joint(id_, raw_min, raw_max, neutral, rest, max_speed, max_accel):
+def _joint(id_, raw_min, raw_max, neutral, rest, max_speed, max_accel, rest_tolerance_deg=0.5):
     return {
         "id": id_, "raw_min": raw_min, "raw_max": raw_max, "neutral": neutral, "rest": rest,
+        "rest_tolerance_deg": rest_tolerance_deg,
         "direction": 1, "max_speed": max_speed, "max_accel": max_accel,
         "current_limit_ma": 800, "hold_current_limit_ma": 800,
         "temp_warn_c": 55, "temp_soft_c": 60, "temp_hard_c": 65,
@@ -22,11 +23,11 @@ BASE = {
     "spike_ticks": 3, "fault_debounce_ticks": 3, "hold_window_s": 2.0, "hard_misses": 5,
     "soft_limit_margin_deg": 2.0, "soft_hold_timeout_s": 1.0,
     "rest_speed_deg_s": 15.0, "rest_torque_fraction": 0.5,
-    "rest_done_within_deg": 3.0, "near_rest_deg": 5.0, "rest_timeout_s": 10.0,
+    "rest_timeout_s": 10.0,
     "joints": {
         "turn": _joint(4, 1873, 2918, 2286, 2286, 120.0, 400.0),
         "nod": _joint(3, 2744, 3133, 2939, 3133, 90.0, 300.0),
-        "lean": _joint(1, 824, 1043, 934, 824, 45.0, 150.0),
+        "lean": _joint(1, 824, 1043, 934, 806, 45.0, 150.0, rest_tolerance_deg=0.5),
     },
 }
 

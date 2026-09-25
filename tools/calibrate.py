@@ -31,6 +31,8 @@ def derive_joint(name, neutral_raw, positive_raw, seen_min, seen_max, limp_raw, 
     neutral = min(max(neutral_raw, raw_min), raw_max)
     if name == "turn":
         rest = neutral
+    elif name == "lean":
+        rest = limp_raw   # lean is only stable limp exactly where it settles, on its back stop
     else:
         rest = raw_min if abs(limp_raw - raw_min) <= abs(limp_raw - raw_max) else raw_max
     return {"raw_min": raw_min, "raw_max": raw_max, "neutral": neutral, "rest": rest,

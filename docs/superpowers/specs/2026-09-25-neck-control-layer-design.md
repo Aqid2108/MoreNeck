@@ -167,17 +167,21 @@ replaced with measured values in bring-up step 5.
   *Why (hardware, 2026-09-25):* one tick read nod at 82 °C between 28 °C readings; the old
   immediate-limp HARD dropped the head from 46° up and the swing knocked lean off its rest stop
   to its forward end.
-- **Near-rest shortcut:** if lean and nod are both within 5° of their rest positions, any
-  SOFT or HARD fault → torque off immediately.
+- **No near-rest shortcut:** every controllable fault lowers the head under control first.
+  *Why (hardware, 2026-09-25):* with lean 2° off its back stop, going limp let the head fall
+  ~70° forward on lean.
 - **Rest sequence:** torque limit → 50%; targets := rest pose; max speed 15 °/s on all joints;
-  when lean and nod are within 3° of rest, torque off. If rest has not finished within
+  when lean and nod are each within their `rest_tolerance_deg` of rest (lean 0.5°, nod 3°),
+  torque off. If rest has not finished within
   `rest_timeout_s` (10 s) — e.g. something is under the head — record a fault and torque off.
 - **While limp:** torque-off is re-sent every tick (it is an unacknowledged broadcast).
 - **Startup goal check:** after writing goal = present, read the goal registers back and only
   enable torque once they match (up to 3 attempts, else `BusError`).
-- **Rest pose vs. end stops:** the rest *targets* for lean and nod are the soft-limit ends
-  nearest their stops (not the stops themselves), so the servo never stalls against a stop
-  under torque; going limp lets the last ~2° settle onto the stop.
+- **Rest pose vs. end stops:** lean's rest target is the position where it settles limp *on its
+  back stop* (measured by `calibrate.py`), which may lie outside the soft limits — lean is only
+  stable limp there; 2° forward of it gravity tips the head forward. `look()` stays within the
+  soft limits; only the rest sequence targets `rest`. Nod's rest is its soft-limit end nearest
+  the stop; limp, gravity settles it back onto the stop (the stable direction).
 - Every fault record: timestamp, tier, reasons, full readings for all joints.
 
 **Known gap:** the STS3215 has no communication timeout. If the Python process dies without
@@ -210,7 +214,7 @@ about 2286 (−36° / +56°); calibration confirms or corrects that neutral.
   lag; injectable jam, dropped replies, temperature rise, voltage sag, status fault):
   no-jump startup; speed/accel limits respected; targets clamped to soft limits;
   SOFT → hold → rest → limp; controllable HARD → rest → limp; uncontrollable HARD → immediate limp;
-  single-sample spikes ignored; near-rest shortcut; latch and
+  single-sample spikes ignored; rest not done until lean is on its stop; latch and
   `clear_fault()`; `close()` and `KeyboardInterrupt` always rest.
 - `test_bus_parsing.py` — decode recorded group-read packets, including 2-byte current,
   sign-magnitude speed/current, and missing replies.

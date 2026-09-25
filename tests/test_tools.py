@@ -4,10 +4,10 @@ from tools.calibrate import derive_joint
 from tools.log_current import summarize
 
 
-def test_derive_joint_insets_limits_and_picks_rest_nearest_limp_end():
+def test_derive_joint_insets_limits_and_rests_lean_where_it_settles_limp():
     j = derive_joint("lean", neutral_raw=934, positive_raw=1000, seen_min=801, seen_max=1066,
                      limp_raw=808)
-    assert j == {"raw_min": 824, "raw_max": 1043, "neutral": 934, "rest": 824, "direction": 1}
+    assert j == {"raw_min": 824, "raw_max": 1043, "neutral": 934, "rest": 808, "direction": 1}
 
 
 def test_derive_joint_negative_direction_and_high_rest():
