@@ -50,3 +50,9 @@ def test_summarize_peak_and_holding_mean():
     assert s["hold_mean_ma"] == pytest.approx(300.0)
     assert s["recommended_current_limit_ma"] == 1200      # ceil(1.3 * 900 / 50) * 50
     assert s["recommended_hold_limit_ma"] == 400          # ceil(1.3 * 300 / 50) * 50
+
+
+def test_derive_joint_rejects_a_range_that_was_barely_explored():
+    with pytest.raises(ValueError, match="only moved"):
+        derive_joint("turn", neutral_raw=2061, positive_raw=1990, seen_min=2022, seen_max=2084,
+                     limp_raw=2061)
