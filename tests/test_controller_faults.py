@@ -1,0 +1,132 @@
+import pytest
+
+from neck.controller import Mode, NeckController
+from neck.safety import Level
+from tests.fake_bus import FakeBus, FakeClock
+
+
+def make(cfg, start="neutral"):
+    clock = FakeClock()
+    starts = {n: (j.neutral if start == "neutral" else j.rest) for n, j in cfg.joints.items()}
+    bus = FakeBus(cfg, clock, start_positions=starts)
+    ctrl = NeckController(cfg, bus, clock=clock, sleep=clock.advance)
+    ctrl.start(run_thread=False)
+    return ctrl, bus, clock
+
+
+def run(ctrl, clock, seconds):
+    for _ in range(round(seconds * ctrl.cfg.loop_hz)):
+        clock.advance(1 / ctrl.cfg.loop_hz)
+        ctrl.tick()
+
+
+def test_hard_fault_goes_limp_immediately(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].temperature = 66
+    run(ctrl, clock, 0.02)
+    assert ctrl.mode == Mode.LIMP
+    assert bus.torque_log[-1] is False
+    assert ctrl.latched.level == Level.HARD
+    assert any("temperature" in r for r in ctrl.latched.reasons)
+
+
+def test_status_bits_go_limp(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["turn"].status = 0x20
+    run(ctrl, clock, 0.02)
+    assert ctrl.mode == Mode.LIMP
+
+
+def test_lost_servo_goes_limp_after_five_misses(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].responding = False
+    run(ctrl, clock, 4 / 50)
+    assert ctrl.mode == Mode.RUNNING
+    run(ctrl, clock, 1 / 50)
+    assert ctrl.mode == Mode.LIMP
+
+
+def test_jam_holds_and_latches_without_resting(cfg):
+    ctrl, bus, clock = make(cfg)
+    ctrl.look(turn=30.0)
+    run(ctrl, clock, 0.1)
+    bus.servos["turn"].jammed = True
+    jammed_at = bus.servos["turn"].position
+    run(ctrl, clock, 1.0)
+    assert ctrl.latched is not None and ctrl.latched.level == Level.SOFT
+    assert any("tracking" in r for r in ctrl.latched.reasons)
+    assert ctrl.mode == Mode.RUNNING                     # holding, not resting
+    assert ctrl.setpoints["turn"] == pytest.approx(jammed_at, abs=1)
+    assert ctrl.look(turn=0.0) is False                  # latched: commands ignored
+    run(ctrl, clock, 3.0)
+    assert ctrl.mode == Mode.RUNNING
+
+
+def test_persistent_soft_fault_rests_then_goes_limp(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 0.1)
+    assert ctrl.latched.level == Level.SOFT
+    assert ctrl.mode == Mode.RUNNING
+    run(ctrl, clock, 1.0)
+    assert ctrl.mode == Mode.RESTING
+    assert bus.torque_limit_log[-1] == 0.5
+    run(ctrl, clock, 4.0)
+    assert ctrl.mode == Mode.LIMP
+    assert bus.torque_log[-1] is False
+    for name in ("lean", "nod"):
+        assert abs(bus.servos[name].position - cfg.joints[name].rest) <= 35   # within 3 degrees
+
+
+def test_rest_moves_no_faster_than_rest_speed(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 1.2)
+    assert ctrl.mode == Mode.RESTING
+    n_before = len(bus.writes)
+    run(ctrl, clock, 1.0)
+    nod = [w["nod"] for w in bus.writes[n_before:]]
+    per_tick = cfg.rest_speed_deg_s / (360 / 4096) / cfg.loop_hz
+    assert max(abs(b - a) for a, b in zip(nod, nod[1:])) <= per_tick + 1
+
+
+def test_soft_fault_near_rest_goes_limp_without_resting(cfg):
+    ctrl, bus, clock = make(cfg, start="rest")
+    bus.servos["lean"].current_ma = 2000.0
+    run(ctrl, clock, 0.06)
+    assert ctrl.mode == Mode.LIMP
+    assert 0.5 not in bus.torque_limit_log
+
+
+def test_hard_fault_during_rest_goes_limp(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 1.2)
+    assert ctrl.mode == Mode.RESTING
+    bus.servos["turn"].temperature = 70
+    run(ctrl, clock, 0.02)
+    assert ctrl.mode == Mode.LIMP
+    assert ctrl.faults[-1].level == Level.HARD
+
+
+def test_clear_fault_restarts_without_jump(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].temperature = 66
+    run(ctrl, clock, 0.02)
+    assert ctrl.mode == Mode.LIMP
+    bus.servos["nod"].temperature = 30
+    ctrl.clear_fault()
+    assert ctrl.mode == Mode.RUNNING
+    assert ctrl.latched is None
+    assert len(ctrl.faults) == 1
+    assert not bus.jump_risk
+    assert ctrl.look(turn=10.0) is True
+
+
+def test_fault_record_keeps_readings(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].temperature = 66
+    run(ctrl, clock, 0.02)
+    fault = ctrl.faults[0]
+    assert fault.readings["nod"].temperature == 66
+    assert fault.time == pytest.approx(0.02)
