@@ -43,6 +43,7 @@ class JointConfig:
 class NeckConfig:
     loop_hz: float
     port_vid: int
+    port_pid: int
     baudrate: int
     voltage_warn_below: float
     voltage_soft_below: float
@@ -59,6 +60,7 @@ class NeckConfig:
     rest_torque_fraction: float
     rest_done_within_deg: float
     near_rest_deg: float
+    rest_timeout_s: float
     joints: dict[str, JointConfig]
 
 
@@ -92,7 +94,10 @@ def config_from_dict(d: dict) -> NeckConfig:
     if len(set(ids)) != len(ids):
         raise ValueError(f"duplicate servo id in joints: {ids}")
     top = {f.name for f in fields(NeckConfig)} - {"joints"}
-    return NeckConfig(**{k: d[k] for k in top}, joints=joints)
+    cfg = NeckConfig(**{k: d[k] for k in top}, joints=joints)
+    if cfg.loop_hz <= 0:
+        raise ValueError(f"loop_hz must be positive, got {cfg.loop_hz}")
+    return cfg
 
 
 def load_config(path: Path | str = DEFAULT_CONFIG) -> NeckConfig:

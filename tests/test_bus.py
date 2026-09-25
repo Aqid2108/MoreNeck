@@ -1,6 +1,9 @@
+import termios
+
+import pytest
 import serial
 
-from neck.bus import Reading, ServoBus, decode_reading, goal_bytes
+from neck.bus import BusError, Reading, ServoBus, decode_reading, find_port, goal_bytes
 
 
 def packet(position=805, speed=0, load=0, voltage=74, temp=27, status=0, moving=0,
@@ -44,8 +47,18 @@ def test_goal_bytes_rounds_and_clamps():
     assert goal_bytes(9999) == [0xFF, 0x0F]
 
 
+class StubSerial:
+    def __init__(self):
+        self.input_resets = 0
+
+    def reset_input_buffer(self):
+        self.input_resets += 1
+
+
 class StubPort:
-    is_using = True  # simulate a flag left set by an earlier failed transaction
+    def __init__(self):
+        self.is_using = True  # simulate a flag left set by an earlier failed transaction
+        self.ser = StubSerial()
 
 
 class StubReader:
@@ -92,3 +105,61 @@ def test_read_all_returns_none_on_serial_exception():
     bus = stub_bus()
     bus._reader.raise_exc = serial.SerialException("device disconnected")
     assert bus.read_all() == {"lean": None, "nod": None}
+
+
+def test_read_all_discards_stale_input_bytes_first():
+    bus = stub_bus()
+    bus._reader.replies = {1: packet(), 3: packet()}
+    bus.read_all()
+    assert bus._port_handler.ser.input_resets == 1
+
+
+def test_read_all_returns_none_on_termios_error():
+    # macOS raises termios.error (not OSError) from tcdrain when the USB device is gone
+    bus = stub_bus()
+    bus._reader.raise_exc = termios.error(6, "Device not configured")
+    assert bus.read_all() == {"lean": None, "nod": None}
+
+
+class StubHandler:
+    def __init__(self, goals=None, raise_exc=None):
+        self.goals = goals or {}
+        self.raise_exc = raise_exc
+
+    def syncWriteTxOnly(self, *args):
+        raise self.raise_exc
+
+    def read2ByteTxRx(self, sid, address):
+        assert address == 42
+        if sid in self.goals:
+            return self.goals[sid], 0, 0
+        return 0, -6, 0
+
+
+def test_write_goals_returns_false_on_termios_error():
+    bus = stub_bus()
+    bus._ph = StubHandler(raise_exc=termios.error(6, "Device not configured"))
+    assert bus.write_goals({"lean": 900}) is False
+
+
+def test_read_goals_reads_goal_register_per_servo():
+    bus = stub_bus()
+    bus._ph = StubHandler(goals={1: 905})
+    assert bus.read_goals() == {"lean": 905, "nod": None}
+
+
+class FakePortInfo:
+    def __init__(self, device, vid, pid):
+        self.device, self.vid, self.pid = device, vid, pid
+
+
+def test_find_port_matches_vendor_and_product(monkeypatch):
+    ports = [FakePortInfo("/dev/cu.eyes", 0x1A86, 0x7523), FakePortInfo("/dev/cu.servos", 0x1A86, 0x55D3)]
+    monkeypatch.setattr("neck.bus.list_ports.comports", lambda: ports)
+    assert find_port(0x1A86, 0x55D3) == "/dev/cu.servos"
+
+
+def test_find_port_raises_when_adapter_absent(monkeypatch):
+    monkeypatch.setattr("neck.bus.list_ports.comports", lambda: [FakePortInfo("/dev/cu.eyes", 0x1A86, 0x7523)])
+    with pytest.raises(BusError, match="55d3"):
+        find_port(0x1A86, 0x55D3)

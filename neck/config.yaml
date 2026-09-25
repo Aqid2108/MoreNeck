@@ -2,6 +2,7 @@
 # Joint limits/neutral/rest/direction are rewritten by tools/calibrate.py.
 loop_hz: 50
 port_vid: 0x1A86
+port_pid: 0x55D3   # WCH CH343 bus adapter (an ESP32 CH340 shares the vendor ID)
 baudrate: 1000000
 
 voltage_warn_below: 6.8
@@ -21,6 +22,7 @@ rest_speed_deg_s: 15.0
 rest_torque_fraction: 0.5
 rest_done_within_deg: 3.0
 near_rest_deg: 5.0
+rest_timeout_s: 10.0
 
 joints:
   turn:

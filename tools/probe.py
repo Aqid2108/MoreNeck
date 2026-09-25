@@ -7,14 +7,14 @@ import time
 import serial
 from serial.tools import list_ports
 
-VID = 0x1A86
+VID, PID = 0x1A86, 0x55D3
 
 
 def find_port():
     for p in list_ports.comports():
-        if p.vid == VID:
+        if p.vid == VID and p.pid == PID:
             return p.device
-    raise SystemExit(f"No USB serial device with VID {VID:#06x}. Is the bus adapter plugged in?")
+    raise SystemExit(f"No USB serial device {VID:04x}:{PID:04x}. Is the bus adapter plugged in?")
 
 
 def packet(sid, instr, params=b""):

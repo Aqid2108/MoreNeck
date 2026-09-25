@@ -68,3 +68,14 @@ def test_update_joint_config_rewrites_file(tmp_path):
     assert c.joints["turn"].neutral == 2300
     assert c.joints["turn"].direction == -1
     assert c.joints["nod"].neutral == 2939
+
+
+def test_default_config_has_bus_pid_and_rest_timeout():
+    c = load_config(DEFAULT_CONFIG)
+    assert c.port_pid == 0x55D3
+    assert c.rest_timeout_s == 10.0
+
+
+def test_loop_hz_must_be_positive(make_cfg):
+    with pytest.raises(ValueError, match="loop_hz"):
+        make_cfg({"loop_hz": 0})

@@ -36,6 +36,11 @@ class Fault:
     readings: dict = field(repr=False)
 
 
+def _reason_keys(reasons: list[str]) -> frozenset:
+    """'SOFT: nod: current 2000 mA ...' -> ('SOFT:', 'nod:', 'current'): identity without the numbers."""
+    return frozenset(tuple(r.split()[:3]) for r in reasons)
+
+
 class NeckController:
     def __init__(self, cfg, bus, clock=time.monotonic, sleep=time.sleep, on_tick=None):
         self.cfg = cfg
@@ -54,6 +59,7 @@ class NeckController:
         self._history = new_history(cfg)
         self._soft_since: float | None = None
         self._rest_speed: float | None = None
+        self._rest_started = 0.0
         self._last_warn: list[str] | None = None
         self._opened = False
         self._closed = False
@@ -85,7 +91,7 @@ class NeckController:
             if missing:
                 raise BusError(f"servos not responding: {', '.join(missing)}")
             present = {n: r.position for n, r in readings.items()}
-            self.bus.write_goals(present)          # goal = present BEFORE torque on: no jump
+            self._write_verified_goals(present)    # goal = present BEFORE torque on: no jump
             self.bus.configure_for_streaming()
             self.bus.set_torque_limit(1.0)
             self.bus.set_torque(True)
@@ -97,6 +103,17 @@ class NeckController:
             self._soft_since = None
             self._rest_speed = None
             self.mode = Mode.RUNNING
+
+    def _write_verified_goals(self, present: dict[str, int], attempts: int = 3) -> None:
+        # Goal writes are unacknowledged broadcasts; a lost one would make torque-on drive the
+        # head back to a stale goal at full speed. Read the registers back before trusting them.
+        goals = {}
+        for _ in range(attempts):
+            self.bus.write_goals(present)
+            goals = self.bus.read_goals()
+            if all(g is not None and abs(g - present[n]) <= 1 for n, g in goals.items()):
+                return
+        raise BusError(f"goal positions did not verify before torque-on: wrote {present}, read {goals}")
 
     def close(self) -> None:
         if self._closed:
@@ -180,6 +197,10 @@ class NeckController:
         try:
             self.tick()
         except Exception as exc:
+            with self._lock:
+                if self.mode == Mode.LIMP and self.latched is not None:
+                    log.debug("tick failed while limp: %r", exc)
+                    return
             log.exception("tick failed")
             with self._lock:
                 self._fault(Verdict(Level.HARD, [f"HARD: controller exception: {exc!r}"]),
@@ -195,9 +216,16 @@ class NeckController:
             self.readings = readings
             holding = {n: self.velocities.get(n, 0.0) == 0.0
                        and self.setpoints.get(n) == self.targets.get(n) for n in self.cfg.joints}
-            if self.mode != Mode.LIMP:
+            if self.mode == Mode.LIMP:
+                # Torque-off is an unacknowledged broadcast: keep re-sending it while limp.
+                self.bus.set_torque(False)
+            else:
                 verdict = check(readings, self.setpoints, holding, self.cfg, self._history, now)
                 self._handle(verdict, readings, now)
+            if self.mode == Mode.RESTING and now - self._rest_started > self.cfg.rest_timeout_s:
+                self._fault(Verdict(Level.SOFT, [f"SOFT: rest did not finish within "
+                                                 f"{self.cfg.rest_timeout_s:.0f} s"]), readings, now)
+                self._go_limp()
             if self.mode in (Mode.RUNNING, Mode.RESTING):
                 self._step_motion(1 / self.cfg.loop_hz)
                 self.bus.write_goals({n: int(round(sp)) for n, sp in self.setpoints.items()})
@@ -227,9 +255,11 @@ class NeckController:
                 self._fault(verdict, readings, now)
                 self._hold(readings)
                 self._soft_since = now
-            elif self._soft_since is None:
+            elif _reason_keys(verdict.reasons) != _reason_keys(self.faults[-1].reasons):
+                self._fault(verdict, readings, now)
+            if self._soft_since is None:
                 self._soft_since = now
-            elif now - self._soft_since >= self.cfg.soft_hold_timeout_s:
+            if now - self._soft_since >= self.cfg.soft_hold_timeout_s:
                 log.error("SOFT fault persisted %.1f s; resting", now - self._soft_since)
                 self._begin_rest()
         else:
@@ -270,6 +300,7 @@ class NeckController:
     def _begin_rest(self) -> None:
         self.targets = {n: float(j.rest) for n, j in self.cfg.joints.items()}
         self._rest_speed = self.cfg.rest_speed_deg_s
+        self._rest_started = self.clock()
         self.bus.set_torque_limit(self.cfg.rest_torque_fraction)
         self.mode = Mode.RESTING
 

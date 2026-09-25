@@ -45,6 +45,8 @@ class FakeBus:
         self.streaming_configured = False
         self.jump_risk = False
         self.raise_on_read: Exception | None = None
+        self.drop_goal_writes = 0      # next N write_goals calls are silently lost (unacked broadcast)
+        self.drop_torque_off = 0       # next N set_torque(False) calls are silently lost
 
     def open(self) -> None:
         self.opened = True
@@ -75,7 +77,13 @@ class FakeBus:
             for n, s in self.servos.items()
         }
 
+    def read_goals(self):
+        return {n: (s.goal if s.responding else None) for n, s in self.servos.items()}
+
     def write_goals(self, goals) -> bool:
+        if self.drop_goal_writes:
+            self.drop_goal_writes -= 1
+            return True
         for n, raw in goals.items():
             assert isinstance(raw, int) and 0 <= raw <= 4095, (n, raw)
             self.servos[n].goal = raw
@@ -83,13 +91,16 @@ class FakeBus:
         return True
 
     def set_torque(self, on: bool) -> bool:
+        self.torque_log.append(on)
+        if not on and self.drop_torque_off:
+            self.drop_torque_off -= 1
+            return True
         if on:
             for s in self.servos.values():
                 if s.goal is None or abs(s.goal - s.position) > 1:
                     self.jump_risk = True
         for s in self.servos.values():
             s.torque = on
-        self.torque_log.append(on)
         return True
 
     def set_torque_limit(self, fraction: float) -> bool:

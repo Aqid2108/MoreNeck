@@ -130,3 +130,39 @@ def test_fault_record_keeps_readings(cfg):
     fault = ctrl.faults[0]
     assert fault.readings["nod"].temperature == 66
     assert fault.time == pytest.approx(0.02)
+
+
+def test_automatic_rest_times_out_when_obstructed(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 1.2)
+    assert ctrl.mode == Mode.RESTING
+    bus.servos["nod"].jammed = True
+    run(ctrl, clock, cfg.rest_timeout_s + 0.5)
+    assert ctrl.mode == Mode.LIMP
+    assert all(not s.torque for s in bus.servos.values())
+    assert any("rest did not finish" in r for f in ctrl.faults for r in f.reasons)
+
+
+def test_limp_resends_torque_off_until_it_sticks(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.drop_torque_off = 1
+    bus.servos["nod"].temperature = 66
+    run(ctrl, clock, 0.02)
+    assert ctrl.mode == Mode.LIMP
+    assert bus.servos["nod"].torque is True          # the first torque-off packet was lost
+    run(ctrl, clock, 0.02)
+    assert all(not s.torque for s in bus.servos.values())
+
+
+def test_new_soft_fault_after_latch_is_recorded_once(cfg):
+    ctrl, bus, clock = make(cfg)
+    bus.servos["nod"].current_ma = 2000.0
+    run(ctrl, clock, 0.1)
+    bus.servos["nod"].current_ma = 100.0
+    run(ctrl, clock, 0.2)
+    assert len(ctrl.faults) == 1
+    bus.servos["turn"].temperature = 61
+    run(ctrl, clock, 0.5)
+    assert len(ctrl.faults) == 2
+    assert any("temperature" in r for r in ctrl.faults[-1].reasons)

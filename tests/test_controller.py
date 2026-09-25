@@ -105,3 +105,19 @@ def test_on_tick_receives_readings_and_setpoints(cfg):
     assert len(seen) == 5
     now, readings, setpoints, holding = seen[-1]
     assert set(readings) == set(setpoints) == set(holding) == {"turn", "nod", "lean"}
+
+
+def test_startup_retries_a_lost_goal_write(cfg):
+    ctrl, bus, _ = make(cfg, start="rest")
+    bus.drop_goal_writes = 1
+    ctrl.start(run_thread=False)
+    assert ctrl.mode == Mode.RUNNING
+    assert not bus.jump_risk
+
+
+def test_startup_refuses_torque_when_goal_cannot_be_verified(cfg):
+    ctrl, bus, _ = make(cfg, start="rest")
+    bus.drop_goal_writes = 100
+    with pytest.raises(BusError, match="goal"):
+        ctrl.start(run_thread=False)
+    assert bus.torque_log == []

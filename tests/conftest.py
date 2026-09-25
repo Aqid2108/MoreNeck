@@ -15,14 +15,14 @@ def _joint(id_, raw_min, raw_max, neutral, rest, max_speed, max_accel):
 
 
 BASE = {
-    "loop_hz": 50, "port_vid": 0x1A86, "baudrate": 1_000_000,
+    "loop_hz": 50, "port_vid": 0x1A86, "port_pid": 0x55D3, "baudrate": 1_000_000,
     "voltage_warn_below": 6.8, "voltage_soft_below": 6.5,
     "voltage_hard_below": 6.0, "voltage_hard_above": 8.0,
     "tracking_max_error_deg": 8.0, "tracking_max_duration_s": 0.3,
     "spike_ticks": 3, "hold_window_s": 2.0, "hard_misses": 5,
     "soft_limit_margin_deg": 2.0, "soft_hold_timeout_s": 1.0,
     "rest_speed_deg_s": 15.0, "rest_torque_fraction": 0.5,
-    "rest_done_within_deg": 3.0, "near_rest_deg": 5.0,
+    "rest_done_within_deg": 3.0, "near_rest_deg": 5.0, "rest_timeout_s": 10.0,
     "joints": {
         "turn": _joint(4, 1873, 2918, 2286, 2286, 120.0, 400.0),
         "nod": _joint(3, 2744, 3133, 2939, 3133, 90.0, 300.0),

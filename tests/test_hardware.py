@@ -35,3 +35,11 @@ def test_torque_limit_register_address_is_correct(bus):
     # If this fails, STOP: REG_TORQUE_LIMIT is wrong and rest() would write the wrong register.
     for name in ("turn", "nod", "lean"):
         assert bus.read_u16(name, REG_TORQUE_LIMIT) == 1000, name
+
+
+def test_goal_register_reads_back(bus):
+    # Startup verifies goal == present via this read before enabling torque.
+    goals = bus.read_goals()
+    assert set(goals) == {"turn", "nod", "lean"}
+    for name, g in goals.items():
+        assert g is not None and 0 <= g <= 4095, name

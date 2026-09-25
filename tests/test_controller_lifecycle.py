@@ -81,3 +81,13 @@ def test_threaded_loop_runs_and_closes_cleanly(cfg):
     assert ctrl.mode == Mode.LIMP
     assert not bus.opened
     assert not ctrl._thread.is_alive()
+
+
+def test_repeated_tick_exceptions_record_a_single_fault(cfg):
+    ctrl, bus, _ = make(cfg)
+    ctrl.start(run_thread=False)
+    bus.raise_on_read = OSError("device disconnected")
+    for _ in range(10):
+        ctrl._safe_tick()
+    assert ctrl.mode == Mode.LIMP
+    assert len(ctrl.faults) == 1

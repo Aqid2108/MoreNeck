@@ -6,6 +6,7 @@ transaction and written in one transaction per tick. Never writes EEPROM.
 from __future__ import annotations
 
 import logging
+import termios
 from dataclasses import dataclass
 
 import serial
@@ -27,6 +28,11 @@ READ_LEN = 15                  # registers 0x38..0x46
 CURRENT_MA_PER_COUNT = 6.5
 STREAM_ACC = 254               # servo-side ramp effectively off; controller shapes motion
 STREAM_SPEED = 3400            # servo-side speed cap effectively off
+
+
+# pyserial raises SerialException/OSError; on macOS a vanished USB device also raises
+# termios.error (not an OSError subclass) from the library's ser.flush().
+SERIAL_ERRORS = (serial.SerialException, OSError, termios.error)
 
 
 class BusError(RuntimeError):
@@ -76,18 +82,19 @@ def goal_bytes(raw: float) -> list[int]:
     return [v & 0xFF, v >> 8]
 
 
-def find_port(vid: int) -> str:
+def find_port(vid: int, pid: int) -> str:
     for p in list_ports.comports():
-        if p.vid == vid:
+        if p.vid == vid and p.pid == pid:
             return p.device
-    raise BusError(f"no USB serial device with VID {vid:#06x}; is the bus adapter plugged in?")
+    raise BusError(f"no USB serial device {vid:04x}:{pid:04x}; is the bus adapter plugged in?")
 
 
 class ServoBus:
-    def __init__(self, ids: dict[str, int], vid: int = 0x1A86, baudrate: int = 1_000_000,
-                 port: str | None = None):
+    def __init__(self, ids: dict[str, int], vid: int = 0x1A86, pid: int = 0x55D3,
+                 baudrate: int = 1_000_000, port: str | None = None):
         self.ids = dict(ids)
         self._vid = vid
+        self._pid = pid
         self._baudrate = baudrate
         self._port = port
         self._port_handler = None
@@ -96,10 +103,11 @@ class ServoBus:
 
     @classmethod
     def from_config(cls, cfg) -> "ServoBus":
-        return cls({n: j.id for n, j in cfg.joints.items()}, vid=cfg.port_vid, baudrate=cfg.baudrate)
+        return cls({n: j.id for n, j in cfg.joints.items()}, vid=cfg.port_vid, pid=cfg.port_pid,
+                   baudrate=cfg.baudrate)
 
     def open(self) -> None:
-        port = self._port or find_port(self._vid)
+        port = self._port or find_port(self._vid, self._pid)
         self._port_handler = PortHandler(port)
         self._port_handler.baudrate = self._baudrate
         if not self._port_handler.openPort():
@@ -131,8 +139,10 @@ class ServoBus:
             self._reader.data_dict[sid] = []
         self._begin()
         try:
+            # syncReadRx reads a fixed byte count, so one stray byte would shift every later frame.
+            self._port_handler.ser.reset_input_buffer()
             self._reader.txRxPacket()
-        except (serial.SerialException, OSError) as exc:
+        except SERIAL_ERRORS as exc:
             log.warning("group read failed: %r", exc)
             return {name: None for name in self.ids}
         out = {}
@@ -148,13 +158,26 @@ class ServoBus:
         self._begin()
         try:
             return writer.txPacket() == COMM_SUCCESS
-        except (serial.SerialException, OSError) as exc:
+        except SERIAL_ERRORS as exc:
             log.warning("sync write to %d failed: %r", address, exc)
             return False
 
     def write_goals(self, goals: dict[str, float]) -> bool:
         return self._sync_write(STS_GOAL_POSITION_L, 2,
                                 {self.ids[n]: goal_bytes(raw) for n, raw in goals.items()})
+
+    def read_goals(self) -> dict[str, int | None]:
+        """Read back each servo's goal position register (acknowledged, per servo)."""
+        out = {}
+        for name, sid in self.ids.items():
+            self._begin()
+            try:
+                value, comm, _ = self._ph.read2ByteTxRx(sid, STS_GOAL_POSITION_L)
+            except SERIAL_ERRORS as exc:
+                log.warning("goal read from %s failed: %r", name, exc)
+                value, comm = 0, -1
+            out[name] = value if comm == COMM_SUCCESS else None
+        return out
 
     def set_torque(self, on: bool) -> bool:
         return self._sync_write(STS_TORQUE_ENABLE, 1, {sid: [1 if on else 0] for sid in self.ids.values()})

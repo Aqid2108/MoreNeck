@@ -26,7 +26,7 @@ fault is logged.
 
 - **Host:** Mac, Python 3.12. Everything runs on the Mac; the ESP32 only drives the eye displays.
 - **Bus adapter:** WCH CH343 (USB `1A86:55D3`), macOS port `/dev/cu.usbmodem*`. Located by
-  USB VID/PID, never a hard-coded path.
+  USB VID **and** PID (`port_vid`, `port_pid`), never a hard-coded path.
 - **Bus:** 1,000,000 baud. Servos: Feetech STS3215 family, model word `0x0309`, firmware 3.10.
 - **Power:** 2S pack through a regulated power module; measured 7.4 V at every servo.
 - **Mechanism:** serial chain. Head is heavy and cantilevered forward; lean and nod carry a
@@ -162,7 +162,11 @@ replaced with measured values in bring-up step 5.
 - **Near-rest shortcut:** if lean and nod are both within 5° of their rest positions, any
   SOFT or HARD fault → torque off immediately.
 - **Rest sequence:** torque limit → 50%; targets := rest pose; max speed 15 °/s on all joints;
-  when lean and nod are within 3° of rest, torque off.
+  when lean and nod are within 3° of rest, torque off. If rest has not finished within
+  `rest_timeout_s` (10 s) — e.g. something is under the head — record a fault and torque off.
+- **While limp:** torque-off is re-sent every tick (it is an unacknowledged broadcast).
+- **Startup goal check:** after writing goal = present, read the goal registers back and only
+  enable torque once they match (up to 3 attempts, else `BusError`).
 - **Rest pose vs. end stops:** the rest *targets* for lean and nod are the soft-limit ends
   nearest their stops (not the stops themselves), so the servo never stalls against a stop
   under torque; going limp lets the last ~2° settle onto the stop.
