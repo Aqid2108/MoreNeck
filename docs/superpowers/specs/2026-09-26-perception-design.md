@@ -60,6 +60,7 @@ data/                  git-ignored: downloaded datasets and (later) recorded cli
 @dataclass(frozen=True)
 class Person:
     id: int
+    box: tuple[float, float, float, float]   # x1, y1, x2, y2
     head_px: tuple[float, float]           # image coordinates
     head_deg: tuple[float, float]          # (yaw, pitch) relative to camera axis; +yaw = robot's left, +pitch = up
     world_yaw_deg: float | None            # neck turn + head yaw, when a neck pose provider is given
@@ -88,8 +89,9 @@ optional `Person` fields without changing existing ones.
 ### Sources (`sources.py`)
 
 - `FrameSource`: `open()`, `read() -> Frame | None`, `close()`; `Frame = (image, capture_time)`.
-- `CameraSource(name, index_fallback, width, height, rotate)`: finds the device index by name
-  (via `cv2-enumerate-cameras`; falls back to the configured index), opens it with OpenCV, and
+- `CameraSource(name, index_fallback, width, height, rotate)`: finds the device by USB ID
+  (`camera_usb_id`, `0C45:6366`), then by name, then the configured index (via
+  `cv2-enumerate-cameras`, whose indices encode the backend), opens it with OpenCV, and
   reads in its own thread keeping **only the latest frame** (stale frames are dropped). Requests
   1280×720, accepts what the camera gives, applies the configured rotation (0/90/180/270).
 - `VideoFileSource(path, realtime=False)`: yields frames with timestamps from the file's frame
@@ -152,14 +154,16 @@ optional `Person` fields without changing existing ones.
 
 ### Pipeline (`pipeline.py`)
 
-- `Perception(source, detector, config, pose_provider=None, on_snapshot=None)`;
+- `Perception(source, detector, config, pose_provider=None, on_snapshot=None)` (called as
+  `on_snapshot(snapshot, image)`; image is `None` for failure snapshots);
   `start()`, `latest() -> Snapshot`, `stop()`; context manager.
 - Background thread: read frame → detect → track → features → publish `Snapshot` (thread-safe
   swap) → `on_snapshot` callback.
 - **Failures:** `read()` returning `None` for > 0.5 s, or a detector exception, publishes a
   snapshot with `source_ok=False`, `people=()`, `error` set, and logs once per failure episode;
   the loop keeps retrying (camera re-open every 2 s).
-- **Staleness:** consumers treat a snapshot older than 0.3 s (by `timestamp`) as "nobody in view".
+- **Staleness:** consumers treat a snapshot older than 0.3 s (by `timestamp`) as "nobody in view";
+  `people_or_empty(snapshot, now, stale_after_s)` returns `()` for failed or stale snapshots.
 - **No frames are ever written to disk** by the pipeline.
 
 ### Tools
@@ -187,12 +191,12 @@ are re-tuned on recorded clips once the hardware is back.
 
 ## Configuration defaults (`perception/config.yaml`)
 
-`camera_name: Webcam`, `camera_index_fallback: 0`, `width: 1280`, `height: 720`, `rotate: 0`,
+`camera_usb_id: "0C45:6366"`, `camera_name: Webcam`, `camera_index_fallback: 0`, `width: 1280`, `height: 720`, `rotate: 0`,
 `hfov_deg: 60`, `model: yolo11n-pose.pt`, `imgsz: 640`, `person_score_min: 0.4`,
 `keypoint_conf_min: 0.5`, `track_iou_min: 0.2`, `track_confirm_frames: 3`, `max_coast_s: 1.0`,
 `shoulder_width_m: 0.40`, `body_height_m: 1.70`, `head_width_m: 0.15`, `distance_ema_alpha: 0.3`,
 `facing_threshold: 0.6`, `motion_window_s: 1.0`, `approach_rate_mps: 0.3`,
-`passing_rate_dps: 15`, `source_timeout_s: 0.5`, `stale_after_s: 0.3`.
+`passing_rate_dps: 15`, `source_timeout_s: 0.5`, `stale_after_s: 0.3`, `reopen_every_s: 2.0`.
 
 ## Testing
 

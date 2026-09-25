@@ -10,19 +10,29 @@ dependencies = [
   "st3215 @ git+https://github.com/Mickael-Roger/python-st3215@143cff5e74453a2fd24e7a3d78aeef644364768a",
   "pyserial>=3.5",
   "pyyaml>=6",
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "opencv-python>=4.9",
+  "cv2-enumerate-cameras>=1.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "motmetrics>=1.4"]
+vision = ["ultralytics>=8.3"]
 
 [tool.setuptools]
-packages = ["neck"]
+packages = ["neck", "perception"]
 
 [tool.setuptools.package-data]
 neck = ["config.yaml"]
+perception = ["config.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["hardware: needs the real robot on the bus (run only on request)"]
-addopts = "-m 'not hardware'"
+markers = [
+  "hardware: needs the real robot on the bus (run only on request)",
+  "model: needs the YOLO pose weights in data/models (run on request)",
+  "camera: needs the head camera plugged in (run only on request)",
+]
+addopts = "-m 'not hardware and not model and not camera'"

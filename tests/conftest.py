@@ -51,3 +51,34 @@ def cfg():
 @pytest.fixture
 def make_cfg():
     return build_config
+
+
+PBASE = {
+    "camera_usb_id": "0C45:6366", "camera_name": "Webcam", "camera_index_fallback": 0,
+    "width": 1280, "height": 720, "rotate": 0, "hfov_deg": 60.0,
+    "model": "data/models/yolo11n-pose.pt", "imgsz": 640,
+    "person_score_min": 0.4, "keypoint_conf_min": 0.5,
+    "track_iou_min": 0.2, "track_confirm_frames": 3, "max_coast_s": 1.0,
+    "shoulder_width_m": 0.40, "body_height_m": 1.70, "head_width_m": 0.15,
+    "distance_ema_alpha": 0.3, "facing_threshold": 0.6,
+    "motion_window_s": 1.0, "approach_rate_mps": 0.3, "passing_rate_dps": 15.0,
+    "source_timeout_s": 0.5, "stale_after_s": 0.3, "reopen_every_s": 2.0,
+}
+
+
+def build_pcfg(overrides=None):
+    from perception.config import config_from_dict
+
+    d = copy.deepcopy(PBASE)
+    d.update(overrides or {})
+    return config_from_dict(d)
+
+
+@pytest.fixture
+def pcfg():
+    return build_pcfg()
+
+
+@pytest.fixture
+def make_pcfg():
+    return build_pcfg
