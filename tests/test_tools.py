@@ -56,3 +56,21 @@ def test_derive_joint_rejects_a_range_that_was_barely_explored():
     with pytest.raises(ValueError, match="only moved"):
         derive_joint("turn", neutral_raw=2061, positive_raw=1990, seen_min=2022, seen_max=2084,
                      limp_raw=2061)
+
+
+def test_ticklog_records_one_row_per_answering_joint_and_saves(tmp_path):
+    import csv
+
+    from neck.bus import Reading
+    from tools.ticklog import TickLog
+
+    log = TickLog(extra=lambda: {"mode": "resting"})
+    r = Reading(position=3000, speed=0, load=-64, voltage=7.4, temperature=28, status=0, moving=True,
+                current_ma=604.5, error=0)
+    log(1.5, {"nod": r, "turn": None}, {"nod": 3010.0, "turn": 2023.0}, {"nod": False, "turn": True})
+    assert log.rows == [{"t": 1.5, "joint": "nod", "position": 3000, "setpoint": 3010.0,
+                         "current_ma": 604.5, "load": -64, "temperature": 28, "voltage": 7.4,
+                         "holding": False, "mode": "resting"}]
+    path = log.save(tmp_path / "ticks.csv")
+    saved = list(csv.DictReader(path.open()))
+    assert saved[0]["mode"] == "resting" and saved[0]["current_ma"] == "604.5"
