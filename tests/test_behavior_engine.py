@@ -131,3 +131,23 @@ def test_close_facing_target_gets_the_preset_lean_whatever_the_current_lean(pres
     for i in range(20, 40):
         e.tick(far, snap(1.0 + i * 0.05, far, pose=(0.0, 0.0, 5.0)), RUNNING, 1.0 + i * 0.05)
     assert e.command.lean == pytest.approx(0.0)
+
+
+def test_a_held_aim_never_carries_over_to_a_new_target(preset):
+    # Robot: after target 9 left (aim -59/30), a new person whose head wasn't seen via keypoints
+    # made the head swing back to -59/30 again and again.
+    e = Engine(preset)
+    far = [person(9, yaw=-25.0, pitch=10.0)]
+    t = 1.0
+    for i in range(10):
+        e.tick(far, snap(t, far, pose=(-30.0, 15.0, 0.0)), RUNNING, t)
+        t += 0.05
+    assert e._aim_cmd.turn < -40
+    for i in range(80):                                  # nobody: lost, then idle at neutral
+        e.tick([], snap(t, [], pose=(0.0, 0.0, 0.0)), RUNNING, t)
+        t += 0.05
+    newcomer = [person(12, yaw=-7.0, pitch=14.0, head_from_keypoints=False)]
+    for i in range(40):
+        e.tick(newcomer, snap(t, newcomer, pose=(0.0, 0.0, 0.0)), RUNNING, t)
+        t += 0.05
+    assert abs(e.command.turn) < 1.0 and abs(e.command.nod) < 1.0   # stays put, no swing to -59

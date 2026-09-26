@@ -70,13 +70,15 @@ class Engine:
         acceleration limits. Stepping a fraction per frame made it stop and restart ~5 times a
         second on the robot. A coasting (predicted) target is never chased.
         """
-        prev = self._aim_cmd
+        # A held aim belongs to one person; never carry it over to someone else (on the robot a
+        # stale aim made the head swing back to where the previous target had been).
+        prev = self._aim_cmd if self._aim_id == person.id else None
         # Only aim at a head that was actually seen: a coasting prediction or a head point guessed
         # from the box top (pinned at the image edge when the face is out of frame) runs away.
         seen = person.visible and person.head_from_keypoints
         if prev is not None and (not new_frame or not seen):
             return Command(prev.turn, prev.nod, lean)
-        if not seen:                                # nothing to hold yet
+        if not seen:                                # nothing of theirs to hold: stay where we are
             return Command(base[0], base[1], lean)
         base_lean = base[2] if len(base) > 2 else 0.0      # measured lean, for the geometry only
         turn, nod = aim_for(base[0], base[1], base_lean, *person.head_deg)
@@ -193,6 +195,7 @@ class Engine:
 
         if self.state not in (State.TRACKING, State.GLANCING):
             self._x = None                                # restart pursuit from wherever we are
+            self._aim = self._aim_id = self._aim_cmd = None   # and forget the old target's aim
         changed = cmd != self.command
         self.command = cmd
         return cmd if changed else None

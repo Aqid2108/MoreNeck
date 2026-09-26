@@ -55,7 +55,8 @@ class Runner:
                 "snapshot_pose": list(snapshot.neck_pose) if snapshot.neck_pose else None,
                 "people": [{"id": p.id, "yaw": p.head_deg[0], "pitch": p.head_deg[1],
                             "conf": p.confidence, "visible": p.visible, "facing": p.facing_score,
-                            "dist": p.distance_m, "motion": p.motion} for p in people],
+                            "dist": p.distance_m, "motion": p.motion,
+                            "head_kp": p.head_from_keypoints} for p in people],
             })
         if cmd is not None:
             if self.neck is not None:
