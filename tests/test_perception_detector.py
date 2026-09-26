@@ -53,3 +53,16 @@ def test_finds_people_in_sample_images(image, min_people):
         nx, ny, nc = d.keypoints["nose"]
         if nc >= 0.5:
             assert x1 - 5 <= nx <= x2 + 5 and y1 - 5 <= ny <= y2 + 5
+
+
+def test_ultralytics_runs_offline_no_analytics_or_auto_downloads():
+    import os
+    import subprocess
+    import sys
+
+    # Fresh interpreter: importing our detector must switch Ultralytics offline before it loads.
+    code = ("import perception.detector, os; from ultralytics.utils import ONLINE; "
+            "print(os.environ.get('YOLO_OFFLINE'), ONLINE)")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120,
+                         env={k: v for k, v in os.environ.items() if k != "YOLO_OFFLINE"})
+    assert out.stdout.split() == ["1", "False"], out.stderr

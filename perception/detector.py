@@ -5,11 +5,16 @@ different backend behind the same detect() interface (MediaPipe is the documente
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
 
 from perception.types import KEYPOINT_NAMES, Detection
+
+# Keep Ultralytics offline in this process: no usage analytics, no automatic downloads (model
+# weights are fetched only with the user's OK). Must be set before ultralytics is first imported.
+os.environ.setdefault("YOLO_OFFLINE", "1")
 
 COCO_INDEX = {name: i for i, name in enumerate(KEYPOINT_NAMES)}   # first 7 COCO keypoints
 
