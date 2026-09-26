@@ -113,7 +113,7 @@ Any confirmed, eligible person in `LOST`/`IDLE`/`SCANNING` → `TRACKING` (highe
 |---|---|---|---|
 | `w_facing` / `w_near` / `w_approach` | 1.0 / 0.6 / 0.5 | 1.0 / 0.6 / 0.8 | 1.0 / 0.6 / 0.3 |
 | `stickiness` / `switch_hold_s` | 0.6 / 1.5 | 0.3 / 0.7 | 0.8 / 2.0 |
-| `follow_gain` | 0.3 | 0.5 | 0.3 |
+| `follow_gain` | 0.4 | 0.5 | 0.4 |
 | `glance_newcomer` / `glance_movement` | true / false | true / true | false / false |
 | `glance_s` / `glance_cooldown_s` | 1.0 / 3.0 | 1.0 / 3.0 | 1.0 / 3.0 |
 | `lost_hold_s` | 2.0 | 3.0 | 1.0 |
@@ -121,6 +121,9 @@ Any confirmed, eligible person in `LOST`/`IDLE`/`SCANNING` → `TRACKING` (highe
 | `scan_amplitude_deg` / `scan_speed_dps` / `scan_nod_deg` / `scan_pause_s` | 40 / 15 / 10 / 1 | 40 / 15 / 10 / 1 | 40 / 15 / 10 / 1 |
 | `lean_deg` | 5 | 10 | 0 |
 | `avert_after_s` / `avert_deg` / `avert_s` | null / 20 / 2 | null / 20 / 2 | 4 / 20 / 2 |
+
+Follow gain 0.4 (not 0.3) for calm/shy: a timing model of the loop (19 fps, 60 ms latency,
+pose at capture) gave ~10° walking lag at 0.3 vs 7.5° at 0.4, with no overshoot on a still target.
 
 Shared: `deadband_deg 1.5`, `lean_near_m 1.5`, `lean_release_m 1.8`, `lean_release_s 1.0`,
 `coast_factor 0.5`, `near_full_m 1.0`, `near_zero_m 4.0`, `newcomer_window_s 0.5`, `loop_hz 20`.
