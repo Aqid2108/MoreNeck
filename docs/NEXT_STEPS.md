@@ -100,4 +100,5 @@ Still to do (needs the user's OK or the hardware):
   Terminal.app camera loop (≈ CPU speed). Not limiting (fits in the 53 ms frame period) — investigate later
   (camera thread contention or power management).
 - IDs change when a person leaves the frame for > 1 s — by design (re-identification deferred).
-- Still to report: facing/away label, approaching/leaving, distance reading at a known distance.
+- Facing/away switches correctly when the head turns; motion shows still / approaching / leaving
+  correctly; distance read 1.8–1.9 m at ~2 m (within the ±30% design). Perception verified live.
