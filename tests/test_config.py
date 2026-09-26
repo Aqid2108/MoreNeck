@@ -14,7 +14,7 @@ def test_default_config_file_loads():
     # Joint limits are rewritten by tools/calibrate.py; check identity and wiring, not values.
     assert {n: j.id for n, j in c.joints.items()} == {"turn": 4, "nod": 3, "lean": 1}
     assert c.port_vid == 0x1A86
-    assert c.loop_hz == 50
+    assert c.loop_hz == 100
 
 
 def test_deg_raw_roundtrip_respects_direction(make_cfg):

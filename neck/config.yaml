@@ -1,4 +1,4 @@
-loop_hz: 50
+loop_hz: 100
 port_vid: 6790
 port_pid: 21971
 baudrate: 1000000
@@ -8,16 +8,19 @@ voltage_hard_below: 6.0
 voltage_hard_above: 8.0
 tracking_max_error_deg: 8.0
 tracking_max_duration_s: 0.3
-spike_ticks: 3
-fault_debounce_ticks: 3
+spike_ticks: 6
+fault_debounce_ticks: 6
 hold_window_s: 2.0
-hard_misses: 5
+hard_misses: 10
 soft_limit_margin_deg: 2.0
 soft_hold_timeout_s: 1.0
 rest_speed_deg_s: 15.0
 rest_torque_fraction: 0.5
 rest_timeout_s: 10.0
 limp_after_rest: false
+servo_speed_factor: 1.2
+servo_speed_margin: 100.0
+servo_acc: 50
 joints:
   turn:
     id: 4

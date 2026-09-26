@@ -42,6 +42,8 @@ class FakeBus:
         self.torque_log: list[bool] = []
         self.torque_limit_log: list[float] = []
         self.writes: list[dict] = []
+        self.speed_writes: list[dict] = []
+        self.acc_writes: list = []
         self.streaming_configured = False
         self.jump_risk = False
         self.raise_on_read: Exception | None = None
@@ -80,7 +82,10 @@ class FakeBus:
     def read_goals(self):
         return {n: (s.goal if s.responding else None) for n, s in self.servos.items()}
 
-    def write_goals(self, goals) -> bool:
+    def write_goals(self, goals, speeds=None, acc=None) -> bool:
+        if speeds is not None:
+            self.speed_writes.append(dict(speeds))
+            self.acc_writes.append(acc)
         if self.drop_goal_writes:
             self.drop_goal_writes -= 1
             return True

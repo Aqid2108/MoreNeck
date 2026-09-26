@@ -144,3 +144,16 @@ def test_pose_is_none_when_a_servo_is_silent(cfg):
     bus.servos["nod"].responding = False
     run(ctrl, clock, 0.02)
     assert ctrl.pose() is None
+
+
+def test_goal_speed_follows_the_planned_speed_and_rests_at_the_margin(cfg):
+    ctrl, bus, clock = make(cfg)
+    ctrl.start(run_thread=False)
+    ctrl.look(turn=40.0)
+    run(ctrl, clock, 0.3)                                     # mid-move
+    v = abs(ctrl.velocities["turn"])
+    assert v > 100
+    assert bus.speed_writes[-1]["turn"] == pytest.approx(v * 1.2 + 100.0)
+    run(ctrl, clock, 3.0)                                     # arrived, holding
+    assert bus.speed_writes[-1]["turn"] == pytest.approx(100.0)
+    assert bus.acc_writes[-1] == 50

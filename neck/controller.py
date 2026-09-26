@@ -239,7 +239,12 @@ class NeckController:
                 self._go_limp()
             if self.mode in (Mode.RUNNING, Mode.RESTING, Mode.RESTED):
                 self._step_motion(1 / self.cfg.loop_hz)
-                self.bus.write_goals({n: int(round(sp)) for n, sp in self.setpoints.items()})
+                # Goal + matching goal speed: the servo moves steadily between our updates instead
+                # of dashing to each goal and waiting (measured +/-7 deg/s speed ripple before).
+                speeds = {n: abs(self.velocities[n]) * self.cfg.servo_speed_factor
+                          + self.cfg.servo_speed_margin for n in self.setpoints}
+                self.bus.write_goals({n: int(round(sp)) for n, sp in self.setpoints.items()},
+                                     speeds=speeds, acc=self.cfg.servo_acc)
                 if self.mode == Mode.RESTING and self._rest_done(readings):
                     if self.cfg.limp_after_rest:
                         self._go_limp()

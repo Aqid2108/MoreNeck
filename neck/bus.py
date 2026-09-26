@@ -82,6 +82,17 @@ def goal_bytes(raw: float) -> list[int]:
     return [v & 0xFF, v >> 8]
 
 
+def goal_speed_bytes(raw: float, speed_counts: float, acc: int) -> list[int]:
+    """Registers 41..47: acceleration, goal position, goal time (0), goal speed (counts/s).
+
+    Speed is kept >= 1: 0 would mean "full speed" to the servo.
+    """
+    pos = goal_bytes(raw)
+    s = min(max(int(round(speed_counts)), 1), STREAM_SPEED)
+    a = min(max(int(acc), 0), 254)
+    return [a, pos[0], pos[1], 0, 0, s & 0xFF, s >> 8]
+
+
 def find_port(vid: int, pid: int) -> str:
     for p in list_ports.comports():
         if p.vid == vid and p.pid == pid:
@@ -162,9 +173,14 @@ class ServoBus:
             log.warning("sync write to %d failed: %r", address, exc)
             return False
 
-    def write_goals(self, goals: dict[str, float]) -> bool:
-        return self._sync_write(STS_GOAL_POSITION_L, 2,
-                                {self.ids[n]: goal_bytes(raw) for n, raw in goals.items()})
+    def write_goals(self, goals: dict[str, float], speeds: dict[str, float] | None = None,
+                    acc: int = STREAM_ACC) -> bool:
+        """Goal positions; with speeds, also a per-servo goal speed and acceleration (one write)."""
+        if speeds is None:
+            return self._sync_write(STS_GOAL_POSITION_L, 2,
+                                    {self.ids[n]: goal_bytes(raw) for n, raw in goals.items()})
+        return self._sync_write(STS_ACC, 7, {self.ids[n]: goal_speed_bytes(raw, speeds[n], acc)
+                                             for n, raw in goals.items()})
 
     def read_goals(self) -> dict[str, int | None]:
         """Read back each servo's goal position register (acknowledged, per servo)."""
