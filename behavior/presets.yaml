@@ -1,0 +1,61 @@
+# Behavior presets. Each preset = shared values + its own. See docs/superpowers/specs/2026-09-26-behavior-design.md
+shared:
+  deadband_deg: 1.5
+  lean_near_m: 1.5
+  lean_release_m: 1.8
+  lean_release_s: 1.0
+  coast_factor: 0.5
+  near_full_m: 1.0
+  near_zero_m: 4.0
+  newcomer_window_s: 0.5
+  loop_hz: 20.0
+  glance_s: 1.0
+  glance_cooldown_s: 3.0
+  scan_after_s: 5.0
+  scan_amplitude_deg: 40.0
+  scan_speed_dps: 15.0
+  scan_nod_deg: 10.0
+  scan_pause_s: 1.0
+  avert_deg: 20.0
+  avert_s: 2.0
+
+presets:
+  calm:
+    w_facing: 1.0
+    w_near: 0.6
+    w_approach: 0.5
+    stickiness: 0.6
+    switch_hold_s: 1.5
+    follow_gain: 0.4
+    glance_newcomer: true
+    glance_movement: false
+    lost_hold_s: 2.0
+    idle_scan: false
+    lean_deg: 5.0
+    avert_after_s: null
+  curious:
+    w_facing: 1.0
+    w_near: 0.6
+    w_approach: 0.8
+    stickiness: 0.3
+    switch_hold_s: 0.7
+    follow_gain: 0.5
+    glance_newcomer: true
+    glance_movement: true
+    lost_hold_s: 3.0
+    idle_scan: true
+    lean_deg: 10.0
+    avert_after_s: null
+  shy:
+    w_facing: 1.0
+    w_near: 0.6
+    w_approach: 0.3
+    stickiness: 0.8
+    switch_hold_s: 2.0
+    follow_gain: 0.4
+    glance_newcomer: false
+    glance_movement: false
+    lost_hold_s: 1.0
+    idle_scan: false
+    lean_deg: 0.0
+    avert_after_s: 4.0
