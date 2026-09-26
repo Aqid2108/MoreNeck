@@ -18,6 +18,7 @@ class Preset:
     stickiness: float
     switch_hold_s: float
     follow_gain: float
+    pursuit_hz: float
     glance_newcomer: bool
     glance_movement: bool
     glance_s: float
@@ -57,7 +58,7 @@ def _validate(p: Preset) -> None:
         (all(v > 0 for v in (p.switch_hold_s, p.glance_s, p.glance_cooldown_s, p.lost_hold_s,
                              p.scan_after_s, p.scan_amplitude_deg, p.scan_speed_dps, p.scan_pause_s,
                              p.avert_s, p.deadband_deg, p.lean_release_s, p.newcomer_window_s,
-                             p.loop_hz)),
+                             p.loop_hz, p.pursuit_hz)),
          "times, speeds and amplitudes must be positive"),
     ]
     for ok, message in checks:

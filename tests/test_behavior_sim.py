@@ -17,7 +17,7 @@ def test_follows_a_walking_person_with_small_lag(preset):
     for _ in range(20):
         sim.run(0.05)
         lags.append(abs(walker.yaw - sim.turn()))
-    assert max(lags) < 8.0
+    assert max(lags) < 12.0          # smoothness traded for lag (was 8; robot shuddered)
 
 
 def test_switches_only_after_the_hold_time(preset):
@@ -115,3 +115,18 @@ def test_person_below_level_keeps_nod_at_zero(preset):
     sim.run(3.0)
     assert sim.neck.pos["nod"] == 0.0
     assert sim.engine.state == State.TRACKING and abs(sim.turn() - 10.0) < 2.0
+
+
+def test_following_a_walker_glides_instead_of_stop_and_go(preset):
+    sim = Sim(preset, [SimPerson(1, yaw=-20.0, yaw_rate=10.0)])
+    sim.camera.noise_deg = 1.9                      # as measured on the robot
+    sim.run(4.0)
+    assert sim.neck.stop_go_rate() < 2.0            # robot today: 5.1/s
+
+
+def test_holding_on_a_still_noisy_person_stays_calm(preset):
+    sim = Sim(preset, [SimPerson(1, yaw=15.0)])
+    sim.camera.noise_deg = 1.9
+    sim.run(4.0)
+    assert sim.neck.stop_go_rate() < 2.0
+    assert abs(sim.turn() - 15.0) < 3.0

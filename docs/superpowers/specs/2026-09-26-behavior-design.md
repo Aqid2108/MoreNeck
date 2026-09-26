@@ -91,16 +91,24 @@ Any confirmed, eligible person in `LOST`/`IDLE`/`SCANNING` → `TRACKING` (highe
   who is not the target; `motion == "passing"` non-targets are *movement* glance candidates. At most
   one glance per `glance_cooldown_s` (3 s); only when enabled by the preset.
 
-### Follow (`follow.py`)
+### Follow (`engine.py` `_follow` / `_pursue`) — revised after the first live run
 
-- Runs **once per new snapshot** (by `Snapshot.timestamp`), never re-applying an old offset.
-- Base pose = `Snapshot.neck_pose` (pose at capture); if `None`, the neck's current pose; if that is
-  `None` too, neutral.
-- `turn_cmd = base_turn + gain·yaw`, `nod_cmd = base_nod + gain·pitch` (head point); an axis whose
-  |offset| < `deadband_deg` (1.5°) keeps its previous command.
+*Why revised:* stepping `gain × offset` per frame made the neck accelerate, brake and **stop ~5×/s**
+(measured on the robot; reproduced in simulation with the real `step_axis` profile), and the head
+chased coasting predictions off the image to its ±60° limit.
+
+- **Aim** = the person's room direction: `pose at capture + camera offset`, updated **once per new
+  snapshot**, only while the person is **visible** (coasting predictions are never chased).
+  Smoothed across frames: `aim += follow_gain × (measured − aim)`, but only when the difference is
+  ≥ `deadband_deg` (3°, ~1.5× the 1.9° measured head-angle noise).
+- **Pursuit:** every 20 Hz tick, a critically damped spring (`pursuit_hz`, 1.0 Hz) moves the
+  commanded position toward the aim, so the neck receives a gliding target and never stop-starts.
 - **Lean:** `lean_deg` when the target is within `lean_near_m` (1.5 m) and facing; back to 0 when
   beyond `lean_release_m` (1.8 m) or not facing for `lean_release_s` (1.0 s).
-- `neck.look()` clamps to soft limits (nod ≥ 0, lean ≥ 0).
+- `neck.look()` clamps to soft limits (nod ≥ 0, lean ≥ 0). Turn acceleration lowered to 200 °/s².
+- Presets: `follow_gain` calm/shy 0.25, curious 0.35; shared `deadband_deg` 3.0, `pursuit_hz` 1.0.
+- Acceptance (simulation, with 1.9° noise and the real motion profile): < 2 stop-go cycles per second
+  of turning; walker at 20 °/s followed with lag < 12° (was 8° — smoothness traded for lag).
 
 ### Idle (`idle.py`)
 

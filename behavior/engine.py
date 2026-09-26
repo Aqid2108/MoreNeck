@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from enum import Enum
 
 from behavior.attention import Attention
-from behavior.follow import Command, Lean, follow_axis
+from behavior.follow import Command, Lean
 from behavior.idle import Scanner
 
 
@@ -42,6 +43,11 @@ class Engine:
         self._last_snapshot_ts: float | None = None
         self._facing_since: float | None = None
         self._avert_command: Command | None = None
+        self._aim: tuple[float, float] | None = None     # smoothed room direction of who we follow
+        self._aim_id: int | None = None
+        self._aim_cmd: Command | None = None              # last aim (before pursuit smoothing)
+        self._x: list[float] | None = None                # pursuit filter state: position ...
+        self._v = [0.0, 0.0]                              # ... and velocity (turn, nod)
 
     def _enter(self, state: State, now: float) -> None:
         self.state = state
@@ -56,15 +62,43 @@ class Engine:
         return (0.0, 0.0, 0.0)
 
     def _follow(self, person, base, new_frame: bool, lean: float) -> Command:
-        prev = self.command
-        if not new_frame and prev is not None:
+        """Aim at the person's room direction (pose at capture + camera offset), smoothed.
+
+        Commanding the whole remaining angle lets the neck glide with its own speed and
+        acceleration limits. Stepping a fraction per frame made it stop and restart ~5 times a
+        second on the robot. A coasting (predicted) target is never chased.
+        """
+        prev = self._aim_cmd
+        if prev is not None and (not new_frame or not person.visible):
             return Command(prev.turn, prev.nod, lean)
-        yaw, pitch = person.head_deg
-        turn = follow_axis(base[0], yaw, self.p.follow_gain, self.p.deadband_deg,
-                           prev.turn if prev else None)
-        nod = follow_axis(base[1], pitch, self.p.follow_gain, self.p.deadband_deg,
-                          prev.nod if prev else None)
-        return Command(turn, nod, lean)
+        if not person.visible:                      # nothing to hold yet
+            return Command(base[0], base[1], lean)
+        world = (base[0] + person.head_deg[0], base[1] + person.head_deg[1])
+        if self._aim is None or self._aim_id != person.id:
+            aim = world
+        else:
+            a = self.p.follow_gain
+            aim = tuple(old if abs(new - old) < self.p.deadband_deg else old + a * (new - old)
+                        for old, new in zip(self._aim, world))
+        self._aim, self._aim_id = aim, person.id
+        return Command(aim[0], aim[1], lean)
+
+    def _pursue(self, cmd: Command, dt: float) -> Command:
+        """Critically damped spring from the current command toward the aim, every tick.
+
+        The neck then receives a target that glides (velocity eases in and out) instead of one
+        that jumps each frame, which its accelerate-brake-stop profile turned into shudder.
+        """
+        if self._x is None:
+            start = self.command or cmd
+            self._x, self._v = [start.turn, start.nod], [0.0, 0.0]
+        w = 2 * math.pi * self.p.pursuit_hz
+        dt = min(dt, 0.1)
+        for i, goal in enumerate((cmd.turn, cmd.nod)):
+            accel = w * w * (goal - self._x[i]) - 2 * w * self._v[i]
+            self._v[i] += accel * dt
+            self._x[i] += self._v[i] * dt
+        return Command(self._x[0], self._x[1], cmd.lean)
 
     def tick(self, people, snapshot, neck: NeckStatus, now: float) -> Command | None:
         dt = 0.0 if self._last_tick is None else now - self._last_tick
@@ -126,10 +160,14 @@ class Engine:
         # --- output ---
         if self.state == State.TRACKING:
             target = by_id[target_id]
-            cmd = self._follow(target, base, new_frame, self.lean.update(target, now))
+            aim = self._follow(target, base, new_frame, self.lean.update(target, now))
+            self._aim_cmd = aim
+            cmd = self._pursue(aim, dt)
         elif self.state == State.GLANCING:
             lean = self.command.lean if self.command else 0.0
-            cmd = self._follow(by_id[self.glance_id], base, new_frame, lean)
+            aim = self._follow(by_id[self.glance_id], base, new_frame, lean)
+            self._aim_cmd = aim
+            cmd = self._pursue(aim, dt)
         elif self.state == State.AVERTING:
             cmd = self._avert_command
         elif self.state == State.LOST:
@@ -139,6 +177,8 @@ class Engine:
         else:                                            # IDLE
             cmd = NEUTRAL
 
+        if self.state not in (State.TRACKING, State.GLANCING):
+            self._x = None                                # restart pursuit from wherever we are
         changed = cmd != self.command
         self.command = cmd
         return cmd if changed else None

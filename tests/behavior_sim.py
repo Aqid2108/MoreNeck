@@ -1,9 +1,11 @@
 """Closed-loop simulation: people in the room, a camera on the moving head, a speed-limited neck."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+import random
+from dataclasses import dataclass, replace
 
 from behavior.engine import Engine, NeckStatus
+from neck.motion import step_axis
 from perception.pipeline import people_or_empty
 from perception.types import Person, Snapshot
 
@@ -23,14 +25,19 @@ class SimPerson:
 
 
 class SimNeck:
+    """Speed- and acceleration-limited like the real NeckController (same step_axis profile)."""
     LIMITS = {"turn": (-60.0, 60.0), "nod": (0.0, 60.0), "lean": (0.0, 30.0)}
     SPEED = {"turn": 120.0, "nod": 30.0, "lean": 20.0}
+    ACCEL = {"turn": 200.0, "nod": 300.0, "lean": 150.0}
+    SUBSTEPS = 5
 
     def __init__(self):
         self.pos = {"turn": 0.0, "nod": 0.0, "lean": 0.0}
+        self.vel = {k: 0.0 for k in self.pos}
         self.target = dict(self.pos)
         self.running = True
         self.looks = []
+        self.turn_speeds = []            # setpoint speed of turn, every substep
 
     def look(self, turn, nod, lean) -> bool:
         if not self.running:
@@ -42,17 +49,34 @@ class SimNeck:
         return True
 
     def step(self, dt) -> None:
-        for k in self.pos:
-            m = self.SPEED[k] * dt
-            self.pos[k] += max(-m, min(m, self.target[k] - self.pos[k]))
+        h = dt / self.SUBSTEPS
+        for _ in range(self.SUBSTEPS):
+            for k in self.pos:
+                self.pos[k], self.vel[k] = step_axis(self.pos[k], self.vel[k], self.target[k],
+                                                     self.SPEED[k], self.ACCEL[k], h)
+            self.turn_speeds.append((h, self.vel["turn"]))
+
+    def stop_go_rate(self) -> float:
+        """Stop-and-go cycles per second of turning (the jerk measured on the robot: 5.1/s)."""
+        cycles, moving, going = 0, 0.0, False
+        for h, v in self.turn_speeds:
+            if abs(v) > 5:
+                moving += h
+            if not going and abs(v) > 8:
+                going = True
+            elif going and abs(v) < 1:
+                going, cycles = False, cycles + 1
+        return cycles / moving if moving > 0 else 0.0
 
     def pose(self):
         return (self.pos["turn"], self.pos["nod"], self.pos["lean"])
 
 
 class SimCamera:
-    def __init__(self, fps=19.0, latency=0.06):
+    def __init__(self, fps=19.0, latency=0.06, noise_deg=0.0, seed=1):
         self.period, self.latency = 1.0 / fps, latency
+        self.noise_deg = noise_deg          # head-angle measurement noise (robot: ~1.9 deg)
+        self._rng = random.Random(seed)
         self._next = 0.0
         self._pending = []
         self.failed = False
@@ -64,12 +88,20 @@ class SimCamera:
             if self.failed:
                 shot = Snapshot(now, (1280, 720), (), False, "no frames from source")
             else:
-                seen = tuple(p for p in (self._see(w, pose, now) for w in world) if p is not None)
+                seen = tuple(self._noisy(p) for p in (self._see(w, pose, now) for w in world)
+                             if p is not None)
                 shot = Snapshot(now, (1280, 720), seen, True, None, pose)
             self._pending.append((now + self.latency, shot))
             self._next += self.period
         while self._pending and self._pending[0][0] <= now:
             self.latest = self._pending.pop(0)[1]
+
+    def _noisy(self, person):
+        if not self.noise_deg:
+            return person
+        yaw, pitch = person.head_deg
+        return replace(person, head_deg=(yaw + self._rng.gauss(0, self.noise_deg),
+                                         pitch + self._rng.gauss(0, self.noise_deg)))
 
     @staticmethod
     def _see(w, pose, now):

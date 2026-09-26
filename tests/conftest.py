@@ -86,13 +86,13 @@ def make_pcfg():
 
 BBASE = {   # frozen copy of the spec's "calm" preset; tests override what they need
     "w_facing": 1.0, "w_near": 0.6, "w_approach": 0.5, "stickiness": 0.6, "switch_hold_s": 1.5,
-    "follow_gain": 0.4, "glance_newcomer": True, "glance_movement": False, "glance_s": 1.0,
+    "follow_gain": 0.25, "glance_newcomer": True, "glance_movement": False, "glance_s": 1.0,
     "glance_cooldown_s": 3.0, "lost_hold_s": 2.0, "idle_scan": False, "scan_after_s": 5.0,
     "scan_amplitude_deg": 40.0, "scan_speed_dps": 15.0, "scan_nod_deg": 10.0, "scan_pause_s": 1.0,
     "lean_deg": 5.0, "avert_after_s": None, "avert_deg": 20.0, "avert_s": 2.0,
-    "deadband_deg": 1.5, "lean_near_m": 1.5, "lean_release_m": 1.8, "lean_release_s": 1.0,
+    "deadband_deg": 3.0, "lean_near_m": 1.5, "lean_release_m": 1.8, "lean_release_s": 1.0,
     "coast_factor": 0.5, "near_full_m": 1.0, "near_zero_m": 4.0, "newcomer_window_s": 0.5,
-    "loop_hz": 20.0,
+    "loop_hz": 20.0, "pursuit_hz": 1.0,
 }
 
 

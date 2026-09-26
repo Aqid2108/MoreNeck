@@ -28,7 +28,7 @@ joints:
     rest_tolerance_deg: 3.0
     direction: -1
     max_speed: 120.0
-    max_accel: 400.0
+    max_accel: 200.0
     current_limit_ma: 400
     hold_current_limit_ma: 200
     temp_warn_c: 55
