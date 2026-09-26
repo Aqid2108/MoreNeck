@@ -114,3 +114,18 @@ def test_behave_help():
                             text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     assert "--preset" in result.stdout and "--dry-run" in result.stdout
+
+
+def test_on_tick_records_what_each_layer_saw_and_decided(preset):
+    clock = Clock()
+    records = []
+    r = Runner(Engine(preset), FakePerception(snap(10.0, [person(3, yaw=12.0, pitch=4.0)])), FakeNeck(),
+               clock=clock, on_tick=records.append)
+    r.tick()
+    rec = records[0]
+    assert rec["t"] == 10.0 and rec["state"] == "tracking" and rec["target"] == 3
+    assert rec["snapshot_ts"] == 10.0 and rec["snapshot_pose"] == [0.0, 0.0, 0.0]
+    assert rec["neck_pose"] == [0.0, 0.0, 0.0] and rec["sent"] is True
+    assert rec["command"] == [rec["command"][0], rec["command"][1], 0.0] and rec["command"][0] > 0
+    assert rec["people"] == [{"id": 3, "yaw": 12.0, "pitch": 4.0, "conf": 0.9, "visible": True,
+                              "facing": 0.8, "dist": 2.0, "motion": "still"}]

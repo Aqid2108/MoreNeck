@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--preset", default="calm", help="calm, curious or shy")
     parser.add_argument("--view", action="store_true", help="show the camera with overlays")
     parser.add_argument("--dry-run", action="store_true", help="print decisions, don't move the neck")
+    parser.add_argument("--log", action="store_true",
+                        help="record every behavior and neck tick to logs/ (no images)")
     args = parser.parse_args()
 
     import cv2
@@ -33,7 +35,16 @@ def main():
     from perception.sources import CameraSource
     from tools.perception_view import draw_overlay
 
+    import json
+    import time
+
+    from tools.ticklog import TickLog
+
     logging.basicConfig(level=logging.INFO)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    (REPO / "logs").mkdir(exist_ok=True)
+    behavior_log = open(REPO / "logs" / f"behave-{stamp}.jsonl", "w") if args.log else None
+    neck_log = TickLog() if args.log else None
     preset = load_preset(args.preset)
     pcfg = load_perception_config()
     neck = None
@@ -45,14 +56,15 @@ def main():
         from neck.controller import NeckController
 
         ncfg = load_neck_config()
-        neck = NeckController(ncfg, ServoBus.from_config(ncfg))
+        neck = NeckController(ncfg, ServoBus.from_config(ncfg), on_tick=neck_log)
         neck.start()
 
     latest = {"snap": None, "img": None}
     perception = Perception(CameraSource.from_config(pcfg), YoloPoseDetector.from_config(pcfg, REPO),
                             pcfg, pose_provider=neck.pose if neck else None,
                             on_snapshot=lambda s, i: latest.update(snap=s, img=i))
-    runner = Runner(Engine(preset), perception, neck, stale_after_s=pcfg.stale_after_s)
+    on_tick = (lambda rec: behavior_log.write(json.dumps(rec) + "\n")) if behavior_log else None
+    runner = Runner(Engine(preset), perception, neck, stale_after_s=pcfg.stale_after_s, on_tick=on_tick)
     stop = threading.Event()
     try:
         with perception:
@@ -83,6 +95,11 @@ def main():
         if neck is not None:
             neck.close()
         cv2.destroyAllWindows()
+        if behavior_log is not None:
+            behavior_log.close()
+            print("behavior log:", behavior_log.name)
+        if neck_log is not None and neck_log.rows:
+            print("neck log:", neck_log.save(REPO / "logs" / f"behave-neck-{stamp}.csv"))
 
 
 if __name__ == "__main__":

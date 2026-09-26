@@ -13,7 +13,7 @@ log = logging.getLogger("behavior.runner")
 
 class Runner:
     def __init__(self, engine, perception, neck=None, stale_after_s: float = 0.3,
-                 clock=time.monotonic, sleep=time.sleep, printer=print):
+                 clock=time.monotonic, sleep=time.sleep, printer=print, on_tick=None):
         self.engine = engine
         self.perception = perception
         self.neck = neck
@@ -22,6 +22,7 @@ class Runner:
         self._sleep = sleep
         self.printer = printer
         self._last_print = float("-inf")
+        self.on_tick = on_tick          # diagnostic record per tick (see tools/behave.py --log)
 
     def neck_status(self) -> NeckStatus:
         if self.neck is None:                       # dry-run
@@ -41,8 +42,21 @@ class Runner:
         now = self.clock()
         snapshot = self.perception.latest()
         people = people_or_empty(snapshot, now, self.stale_after_s)
-        cmd = self.engine.tick(people, snapshot if snapshot.source_ok else None,
-                               self.neck_status(), now)
+        status = self.neck_status()
+        cmd = self.engine.tick(people, snapshot if snapshot.source_ok else None, status, now)
+        if self.on_tick is not None:
+            c = self.engine.command
+            self.on_tick({
+                "t": now, "state": self.engine.state.value, "target": self.engine.attention.target_id,
+                "glance": self.engine.glance_id, "sent": cmd is not None,
+                "command": [c.turn, c.nod, c.lean] if c else None,
+                "neck_pose": list(status.pose) if status.pose else None,
+                "snapshot_ts": snapshot.timestamp, "source_ok": snapshot.source_ok,
+                "snapshot_pose": list(snapshot.neck_pose) if snapshot.neck_pose else None,
+                "people": [{"id": p.id, "yaw": p.head_deg[0], "pitch": p.head_deg[1],
+                            "conf": p.confidence, "visible": p.visible, "facing": p.facing_score,
+                            "dist": p.distance_m, "motion": p.motion} for p in people],
+            })
         if cmd is not None:
             if self.neck is not None:
                 if not self.neck.look(cmd.turn, cmd.nod, cmd.lean):
