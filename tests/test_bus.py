@@ -163,3 +163,49 @@ def test_find_port_raises_when_adapter_absent(monkeypatch):
     monkeypatch.setattr("neck.bus.list_ports.comports", lambda: [FakePortInfo("/dev/cu.eyes", 0x1A86, 0x7523)])
     with pytest.raises(BusError, match="55d3"):
         find_port(0x1A86, 0x55D3)
+
+
+class RegisterHandler:
+    """Acknowledged per-servo register writes/reads against an in-memory register map."""
+
+    def __init__(self, ids, drop=()):
+        self.regs = {sid: {} for sid in ids}
+        self.drop = set(drop)            # (sid, address) writes that silently don't take effect
+
+    def write1ByteTxRx(self, sid, address, value):
+        if (sid, address) not in self.drop:
+            self.regs[sid][address] = value
+        return 0, 0
+
+    def write2ByteTxRx(self, sid, address, value):
+        return self.write1ByteTxRx(sid, address, value)
+
+    def read1ByteTxRx(self, sid, address):
+        return self.regs[sid].get(address, 0), 0, 0
+
+    def read2ByteTxRx(self, sid, address):
+        return self.regs[sid].get(address, 0), 0, 0
+
+
+def test_streaming_settings_are_written_and_verified_per_servo():
+    bus = stub_bus()
+    bus._ph = RegisterHandler([1, 3])
+    assert bus.configure_for_streaming() is True
+    for sid in (1, 3):
+        assert bus._ph.regs[sid][41] == 254 and bus._ph.regs[sid][46] == 3400
+
+
+def test_streaming_settings_report_a_servo_that_did_not_take_them():
+    # On the robot a broadcast "acceleration 254" never reached nod (it kept 50).
+    bus = stub_bus()
+    bus._ph = RegisterHandler([1, 3], drop={(3, 41)})
+    assert bus.configure_for_streaming() is False
+
+
+def test_torque_limit_is_written_and_verified_per_servo():
+    bus = stub_bus()
+    bus._ph = RegisterHandler([1, 3])
+    assert bus.set_torque_limit(0.5) is True
+    assert bus._ph.regs[1][48] == 500 and bus._ph.regs[3][48] == 500
+    bus._ph = RegisterHandler([1, 3], drop={(1, 48)})
+    assert bus.set_torque_limit(1.0) is False

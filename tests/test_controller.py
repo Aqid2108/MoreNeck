@@ -144,3 +144,11 @@ def test_pose_is_none_when_a_servo_is_silent(cfg):
     bus.servos["nod"].responding = False
     run(ctrl, clock, 0.02)
     assert ctrl.pose() is None
+
+
+def test_startup_refuses_torque_when_servo_settings_cannot_be_verified(cfg):
+    ctrl, bus, _ = make(cfg)
+    bus.configure_for_streaming = lambda: False
+    with pytest.raises(BusError, match="settings"):
+        ctrl.start(run_thread=False)
+    assert bus.torque_log == []

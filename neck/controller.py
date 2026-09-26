@@ -93,8 +93,9 @@ class NeckController:
                 raise BusError(f"servos not responding: {', '.join(missing)}")
             present = {n: r.position for n, r in readings.items()}
             self._write_verified_goals(present)    # goal = present BEFORE torque on: no jump
-            self.bus.configure_for_streaming()
-            self.bus.set_torque_limit(1.0)
+            if not (self.bus.configure_for_streaming() and self.bus.set_torque_limit(1.0)):
+                raise BusError("servo settings (acceleration, speed, torque limit) did not verify; "
+                               "not enabling torque")
             self.bus.set_torque(True)
             self.readings = readings
             self.setpoints = {n: float(p) for n, p in present.items()}

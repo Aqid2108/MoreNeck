@@ -182,14 +182,33 @@ class ServoBus:
     def set_torque(self, on: bool) -> bool:
         return self._sync_write(STS_TORQUE_ENABLE, 1, {sid: [1 if on else 0] for sid in self.ids.values()})
 
+    def _write_verified(self, address: int, value: int, two_bytes: bool) -> bool:
+        """Acknowledged per-servo write plus read-back. Broadcast settings can be lost silently
+        (on the robot, "acceleration 254" never reached nod and it kept an old value)."""
+        ok = True
+        for name, sid in self.ids.items():
+            write = self._ph.write2ByteTxRx if two_bytes else self._ph.write1ByteTxRx
+            read = self._ph.read2ByteTxRx if two_bytes else self._ph.read1ByteTxRx
+            try:
+                self._begin()
+                write(sid, address, value)
+                self._begin()
+                got, comm, _ = read(sid, address)
+            except SERIAL_ERRORS as exc:
+                log.warning("setting register %d on %s failed: %r", address, name, exc)
+                got, comm = None, -1
+            if comm != COMM_SUCCESS or got != value:
+                log.error("%s: register %d is %s, expected %d", name, address, got, value)
+                ok = False
+        return ok
+
     def set_torque_limit(self, fraction: float) -> bool:
         v = int(round(min(max(fraction, 0.0), 1.0) * 1000))
-        return self._sync_write(REG_TORQUE_LIMIT, 2, {sid: [v & 0xFF, v >> 8] for sid in self.ids.values()})
+        return self._write_verified(REG_TORQUE_LIMIT, v, two_bytes=True)
 
     def configure_for_streaming(self) -> bool:
-        acc = self._sync_write(STS_ACC, 1, {sid: [STREAM_ACC] for sid in self.ids.values()})
-        spd = self._sync_write(STS_GOAL_SPEED_L, 2,
-                               {sid: [STREAM_SPEED & 0xFF, STREAM_SPEED >> 8] for sid in self.ids.values()})
+        acc = self._write_verified(STS_ACC, STREAM_ACC, two_bytes=False)
+        spd = self._write_verified(STS_GOAL_SPEED_L, STREAM_SPEED, two_bytes=True)
         return acc and spd
 
     def read_u16(self, name: str, address: int) -> int | None:
