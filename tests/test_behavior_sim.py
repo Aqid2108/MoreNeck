@@ -172,8 +172,8 @@ def test_never_looks_higher_than_the_nod_ceiling(preset):
     p = SimPerson(1, yaw=0.0, pitch=10.0)
     sim = Sim(preset, [p])
     sim.run(2.0)
-    p.pitch = 70.0 - 0.5                         # climbs out of reach over time
-    for _ in range(40):
-        p.pitch = min(80.0, p.pitch + 2.0)
+    for _ in range(90):                          # rises slowly (5 deg/s) to 55 deg, followable
+        p.pitch = min(55.0, p.pitch + 0.5)
         sim.run(0.1)
-    assert sim.neck.pos["nod"] <= 45.0 + 0.5
+    sim.run(2.0)
+    assert 40.0 <= sim.neck.pos["nod"] <= 45.0 + 0.5
