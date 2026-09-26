@@ -5,6 +5,7 @@ import random
 from dataclasses import dataclass, replace
 
 from behavior.engine import Engine, NeckStatus
+from behavior.kinematics import world_to_camera, world_vector
 from neck.motion import step_axis
 from perception.pipeline import people_or_empty
 from perception.types import Person, Snapshot
@@ -106,7 +107,8 @@ class SimCamera:
 
     @staticmethod
     def _see(w, pose, now):
-        yaw, pitch = w.yaw - pose[0], w.pitch - pose[1]
+        # True head geometry (turn above nod): SimPerson.yaw/pitch are room azimuth/elevation.
+        yaw, pitch = world_to_camera(*pose, world_vector(w.yaw, w.pitch))
         if not w.face_visible:
             pitch = VFOV / 2 - 2.0                  # box top clipped at the image edge
         if abs(yaw) > HFOV / 2 or abs(pitch) > VFOV / 2:

@@ -140,3 +140,28 @@ def test_close_person_with_face_out_of_frame_does_not_drag_the_head_up(preset):
     p.face_visible = False                          # box top pinned at the image edge
     sim.run(4.0)
     assert sim.neck.pos["nod"] < nod_before + 3.0
+
+
+def test_target_beyond_turn_reach_does_not_tilt_the_head_up(preset):
+    # Robot log: turn stuck at +58.7 with the person ~79 deg to the side; nod climbed 18 -> 43 deg.
+    p = SimPerson(1, yaw=15.0, pitch=10.0, yaw_rate=10.0)     # walks out to the robot's left
+    sim = Sim(preset, [p])
+    sim.run(5.5)                                                # ~70 deg: head at its turn limit
+    nod_at_limit = sim.neck.pos["nod"]
+    sim.run(1.0)                                                # ~80 deg: beyond turn's reach
+    p.yaw_rate = 0.0
+    sim.run(3.0)
+    assert sim.turn() >= 57.0                                   # as far as it goes (dead zone 3 deg)
+    assert sim.neck.pos["nod"] <= nod_at_limit + 1.0            # and no creeping tilt
+
+
+def test_reachable_target_to_the_side_is_centred(preset):
+    from behavior.kinematics import world_to_camera, world_vector
+
+    p = SimPerson(1, yaw=15.0, pitch=15.0, yaw_rate=10.0)
+    sim = Sim(preset, [p])
+    sim.run(3.0)                                                # walks to 45 deg
+    p.yaw_rate = 0.0
+    sim.run(4.0)
+    yaw, pitch = world_to_camera(*sim.neck.pose(), world_vector(p.yaw, 15.0))
+    assert abs(yaw) < 3.5 and abs(pitch) < 3.5

@@ -8,6 +8,7 @@ from enum import Enum
 from behavior.attention import Attention
 from behavior.follow import Command, Lean
 from behavior.idle import Scanner
+from behavior.kinematics import aim_for
 
 
 class State(str, Enum):
@@ -30,8 +31,9 @@ NEUTRAL = Command(0.0, 0.0, 0.0)
 
 
 class Engine:
-    def __init__(self, preset):
+    def __init__(self, preset, turn_range: tuple[float, float] = (-60.0, 60.0)):
         self.p = preset
+        self.turn_range = turn_range                      # neck soft limits for turn, degrees
         self.attention = Attention(preset)
         self.lean = Lean(preset)
         self.scanner = Scanner(preset)
@@ -76,7 +78,15 @@ class Engine:
             return Command(prev.turn, prev.nod, lean)
         if not seen:                                # nothing to hold yet
             return Command(base[0], base[1], lean)
-        world = (base[0] + person.head_deg[0], base[1] + person.head_deg[1])
+        lean = base[2] if len(base) > 2 else 0.0
+        turn, nod = aim_for(base[0], base[1], lean, *person.head_deg)
+        lo, hi = self.turn_range
+        if not lo <= turn <= hi:
+            # Out of turn's reach: look as far as possible, and don't tilt to compensate (turned far,
+            # the tilt that would line the person up is large - nod climbed to 43-72 deg on the robot).
+            turn = min(max(turn, lo), hi)
+            nod = self._aim[1] if self._aim is not None and self._aim_id == person.id else base[1]
+        world = (turn, nod)
         if self._aim is None or self._aim_id != person.id:
             aim = world
         else:

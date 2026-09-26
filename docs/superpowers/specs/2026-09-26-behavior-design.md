@@ -97,7 +97,11 @@ Any confirmed, eligible person in `LOST`/`IDLE`/`SCANNING` → `TRACKING` (highe
 (measured on the robot; reproduced in simulation with the real `step_axis` profile), and the head
 chased coasting predictions off the image to its ±60° limit.
 
-- **Aim** = the person's room direction: `pose at capture + camera offset`, updated **once per new
+- **Aim** = the person's room direction via the exact head kinematics (`behavior/kinematics.py`:
+  lean and nod tilt the base, turn rotates on top — turned far, nodding mostly rolls the view, so
+  adding angles made nod creep up to 43–72° on the robot). If the aim's turn is beyond the turn
+  soft limits, turn goes to the limit and nod holds (no compensating tilt). Computed from the pose
+  at capture + camera offset, updated **once per new
   snapshot**, only while the person is **visible** (coasting predictions are never chased).
   Only a head point from real head keypoints counts (`Person.head_from_keypoints`): on the robot a
   box-top fallback pinned at the image edge (face out of frame at 0.8 m) ran nod away to +82°.

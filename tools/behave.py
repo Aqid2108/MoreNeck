@@ -64,7 +64,12 @@ def main():
                             pcfg, pose_provider=neck.pose if neck else None,
                             on_snapshot=lambda s, i: latest.update(snap=s, img=i))
     on_tick = (lambda rec: behavior_log.write(json.dumps(rec) + "\n")) if behavior_log else None
-    runner = Runner(Engine(preset), perception, neck, stale_after_s=pcfg.stale_after_s, on_tick=on_tick)
+    turn_range = (-60.0, 60.0)
+    if neck is not None:
+        t = ncfg.joints["turn"]
+        turn_range = tuple(sorted((t.to_deg(t.raw_min), t.to_deg(t.raw_max))))
+    runner = Runner(Engine(preset, turn_range=turn_range), perception, neck,
+                    stale_after_s=pcfg.stale_after_s, on_tick=on_tick)
     stop = threading.Event()
     try:
         with perception:

@@ -23,7 +23,11 @@ def test_tracking_follows_from_the_pose_at_capture(preset):
     p = [person(1, yaw=20.0, pitch=5.0)]
     cmd = e.tick(p, snap(1.0, p, pose=(10.0, 2.0, 0.0)), RUNNING, 1.0)
     assert e.state == State.TRACKING
-    assert cmd.turn == pytest.approx(10.0 + 20.0) and cmd.nod == pytest.approx(2.0 + 5.0)   # room direction
+    from behavior.kinematics import aim_for
+
+    turn, nod = aim_for(10.0, 2.0, 0.0, 20.0, 5.0)                        # exact head geometry
+    assert (cmd.turn, cmd.nod) == pytest.approx((turn, nod))
+    assert turn == pytest.approx(30.0, abs=1.0) and nod == pytest.approx(7.0, abs=1.0)
 
 
 def test_each_snapshot_is_used_once(preset):
