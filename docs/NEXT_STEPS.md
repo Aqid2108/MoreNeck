@@ -80,8 +80,13 @@ Still to do (needs the user's OK or the hardware):
    Steps 5–7; then add an MPS-vs-CPU keypoint agreement check (review I-7; default to CPU if MPS is off).
 2. **Public data** (plan Task 9 Steps 3–5): 2–3 Pexels indoor videos, MOT17 (~5.5 GB) → run
    `tools/eval_perception.py`, record fps / p95 latency / ID switches here.
-3. **Camera** (hardware): `pytest -m camera`, `tools/perception_view.py`; set `rotate` if the image is
-   sideways; calibrate `hfov_deg` with the neck (`geometry.hfov_from_shift`).
+3. **Camera** (hardware): ✅ `pytest -m camera` passes (2026-09-26): found by USB ID at OpenCV index 1200,
+   delivers 1280×720 as requested (native default 1920×1080). Still to do: `tools/perception_view.py`; set
+   `rotate` if the image is sideways; calibrate `hfov_deg` with the neck (`geometry.hfov_from_shift`).
+   **Camera code must run from macOS Terminal.app**: processes launched by the Claude app are silently
+   denied camera access (no prompt, no System Settings entry). Terminal was granted access on 2026-09-26.
+   OpenCV gives up ~0.5 s after requesting permission, so a first-ever run needs a retry loop to let the
+   macOS prompt appear.
 4. **For the behavior spec:** publish timestamped neck poses so perception can (a) interpolate the pose
    to frame capture time and (b) compensate the tracker for head rotation (review I-4/I-6).
 5. 14 deferred minor review items are listed in the ledger (`Final: minor (deferred)` lines).
