@@ -66,3 +66,24 @@ def test_ultralytics_runs_offline_no_analytics_or_auto_downloads():
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120,
                          env={k: v for k, v in os.environ.items() if k != "YOLO_OFFLINE"})
     assert out.stdout.split() == ["1", "False"], out.stderr
+
+
+@pytest.mark.model
+def test_mps_and_cpu_keypoints_agree():
+    # Ultralytics has warned about wrong pose keypoints on Apple MPS; we default to MPS, so check it.
+    import cv2
+    import torch
+    from ultralytics.utils import ASSETS
+
+    from perception.detector import YoloPoseDetector
+
+    if not torch.backends.mps.is_available():
+        pytest.skip("no Apple GPU")
+    img = cv2.imread(str(ASSETS / "bus.jpg"))
+    cpu = sorted(YoloPoseDetector(WEIGHTS, device="cpu").detect(img), key=lambda d: d.box[0])
+    mps = sorted(YoloPoseDetector(WEIGHTS, device="mps").detect(img), key=lambda d: d.box[0])
+    assert len(cpu) == len(mps)
+    for a, b in zip(cpu, mps):
+        for name, (x, y, c) in a.keypoints.items():
+            if c > 0.5:
+                assert abs(x - b.keypoints[name][0]) < 3 and abs(y - b.keypoints[name][1]) < 3, name
