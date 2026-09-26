@@ -26,18 +26,33 @@ class Attention:
         self._challenger: int | None = None
         self._challenger_since = 0.0
         self._last_glance_at = float("-inf")
+        self._low_since: float | None = None      # when the current target's confidence went low
 
     def _eligible(self, people):
         return [x for x in people if x.confidence >= self.p.min_confidence]
 
-    def update(self, people, now: float) -> int | None:
+    def update(self, people, now: float, can_acquire: bool = True) -> int | None:
+        """can_acquire=False: keep following the current target, but take on nobody new."""
         eligible = self._eligible(people)
         # The current target stays while it is present at all: the confidence cutoff applies only
         # to acquiring and challenging, so a one-frame detector dip can't hand attention away.
         by_id = {x.id: x for x in people}
+        if self.target_id in by_id:
+            if by_id[self.target_id].confidence >= self.p.min_confidence:
+                self._low_since = None
+            elif self._low_since is None:
+                self._low_since = now
+            elif now - self._low_since > self.p.low_confidence_drop_s:
+                # A one-frame dip is tolerated; a track that stays low (e.g. a ghost on the ceiling
+                # the real person's track decayed into) is dropped so the head can give up.
+                del by_id[self.target_id]
         if self.target_id not in by_id:
             self.target_id = None
             self._challenger = None
+            self._low_since = None
+        if not can_acquire:
+            self._challenger = None
+            return self.target_id
         if self.target_id is None:
             if eligible:
                 self.target_id = max(eligible, key=lambda x: score(x, self.p)).id

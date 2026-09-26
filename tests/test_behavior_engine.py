@@ -151,3 +151,24 @@ def test_a_held_aim_never_carries_over_to_a_new_target(preset):
         e.tick(newcomer, snap(t, newcomer, pose=(0.0, 0.0, 0.0)), RUNNING, t)
         t += 0.05
     assert abs(e.command.turn) < 1.0 and abs(e.command.nod) < 1.0   # stays put, no swing to -59
+
+
+def test_no_new_target_is_acquired_while_looking_up(preset):
+    # Robot: every ceiling ghost appeared while nod was >= 30 deg; real people are found near level.
+    e = Engine(preset)
+    ghost = [person(7, yaw=0.0, pitch=5.0, confidence=0.9)]
+    for i in range(10):
+        e.tick(ghost, snap(1.0 + i * 0.05, ghost, pose=(0.0, 40.0, 0.0)), RUNNING, 1.0 + i * 0.05)
+    assert e.state == State.IDLE and e.attention.target_id is None
+    for i in range(10, 20):
+        e.tick(ghost, snap(1.0 + i * 0.05, ghost, pose=(0.0, 10.0, 0.0)), RUNNING, 1.0 + i * 0.05)
+    assert e.state == State.TRACKING and e.attention.target_id == 7
+
+
+def test_an_existing_target_is_still_followed_while_looking_up(preset):
+    e = Engine(preset)
+    p = [person(1, yaw=0.0, pitch=10.0)]
+    e.tick(p, snap(1.0, p, pose=(0.0, 10.0, 0.0)), RUNNING, 1.0)
+    for i in range(1, 10):
+        e.tick(p, snap(1.0 + i * 0.05, p, pose=(0.0, 35.0, 0.0)), RUNNING, 1.0 + i * 0.05)
+    assert e.state == State.TRACKING and e.attention.target_id == 1

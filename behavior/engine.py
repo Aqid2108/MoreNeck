@@ -134,7 +134,10 @@ class Engine:
             self._last_snapshot_ts = snapshot.timestamp
         base = self._base(snapshot, neck)
         by_id = {x.id: x for x in people}
-        target_id = self.attention.update(people, now)
+        # New targets only while looking roughly level: every ceiling ghost on the robot appeared
+        # with nod >= 30 deg; an existing target may still be followed higher.
+        target_id = self.attention.update(people, now,
+                                          can_acquire=base[1] <= self.p.acquire_max_nod_deg)
 
         # --- transitions ---
         if self.state in (State.TRACKING, State.GLANCING, State.AVERTING) and target_id is None:

@@ -10,6 +10,8 @@ shared:
   newcomer_window_s: 0.5
   loop_hz: 50.0         # same rate as the neck loop: a slower engine leaves the neck stopping between targets
   max_nod_deg: 45.0      # never aim higher: no face near a table robot needs it, and the ceiling makes ghosts
+  acquire_max_nod_deg: 25.0    # only pick up NEW targets while nod is this low (ceiling ghosts appear higher)
+  low_confidence_drop_s: 0.5   # drop a target whose confidence stays below min_confidence this long
   min_confidence: 0.6    # to become the target or challenge it (ghosts measured 0.44-0.69, people 0.84-0.94)
   pursuit_hz: 1.0        # spring-damper that makes the commanded position glide
   glance_s: 1.0

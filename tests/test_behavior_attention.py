@@ -114,3 +114,25 @@ def test_low_confidence_detections_cannot_become_the_target(preset):
     att = Attention(preset)                      # min_confidence 0.6
     assert att.update([person(1, confidence=0.55, facing_score=1.0)], 0.0) is None
     assert att.update([person(1, confidence=0.65, facing_score=1.0)], 0.1) == 1
+
+
+def test_a_target_that_stays_low_confidence_is_dropped(preset):
+    # Robot: the target's track fell to 0.44 on the ceiling and stayed the target, so the head
+    # never gave up and came back down.
+    att = Attention(preset)
+    att.update([person(1, confidence=0.94)], 0.0)
+    for i in range(1, 9):                                    # 0.4 s low: still the target
+        assert att.update([person(1, confidence=0.44)], i * 0.05) == 1
+    for i in range(9, 14):                                   # past 0.5 s: dropped
+        result = att.update([person(1, confidence=0.44)], i * 0.05)
+    assert result is None
+
+
+def test_confidence_recovering_resets_the_drop_timer(preset):
+    att = Attention(preset)
+    att.update([person(1, confidence=0.94)], 0.0)
+    att.update([person(1, confidence=0.44)], 0.1)
+    att.update([person(1, confidence=0.44)], 0.4)
+    att.update([person(1, confidence=0.9)], 0.45)            # recovered
+    att.update([person(1, confidence=0.44)], 0.5)
+    assert att.update([person(1, confidence=0.44)], 0.9) == 1   # only 0.4 s low since recovery
