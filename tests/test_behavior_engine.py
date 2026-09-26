@@ -116,3 +116,18 @@ def test_a_head_point_guessed_from_the_box_is_never_chased(preset):
     for i in range(1, 40):
         e.tick(guessed, snap(1.0 + i * 0.05, guessed, pose=(0.0, 5.0, 0.0)), RUNNING, 1.0 + i * 0.05)
     assert e.command.nod == pytest.approx(5.0, abs=0.1)
+
+
+def test_close_facing_target_gets_the_preset_lean_whatever_the_current_lean(preset):
+    # Regression: the measured lean shadowed the lean decision, so lean just held still.
+    e = Engine(preset)
+    close = [person(1, yaw=5.0, distance=1.0, facing_score=0.9)]
+    cmd = None
+    for i in range(20):
+        c = e.tick(close, snap(1.0 + i * 0.05, close, pose=(0.0, 0.0, 0.5)), RUNNING, 1.0 + i * 0.05)
+        cmd = c or cmd
+    assert e.command.lean == pytest.approx(5.0)
+    far = [person(1, yaw=5.0, distance=3.0, facing_score=0.9)]
+    for i in range(20, 40):
+        e.tick(far, snap(1.0 + i * 0.05, far, pose=(0.0, 0.0, 5.0)), RUNNING, 1.0 + i * 0.05)
+    assert e.command.lean == pytest.approx(0.0)

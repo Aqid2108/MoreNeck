@@ -78,8 +78,8 @@ class Engine:
             return Command(prev.turn, prev.nod, lean)
         if not seen:                                # nothing to hold yet
             return Command(base[0], base[1], lean)
-        lean = base[2] if len(base) > 2 else 0.0
-        turn, nod = aim_for(base[0], base[1], lean, *person.head_deg)
+        base_lean = base[2] if len(base) > 2 else 0.0      # measured lean, for the geometry only
+        turn, nod = aim_for(base[0], base[1], base_lean, *person.head_deg)
         lo, hi = self.turn_range
         if not lo <= turn <= hi:
             # Out of turn's reach: look as far as possible, and don't tilt to compensate (turned far,
