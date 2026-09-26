@@ -31,6 +31,7 @@ class Person:
     visible: bool                       # False while coasting through an occlusion
     first_seen: float
     last_seen: float
+    head_from_keypoints: bool = True    # False: head point guessed from the box top (don't aim at it)
 
 
 @dataclass(frozen=True)

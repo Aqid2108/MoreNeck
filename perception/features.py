@@ -25,6 +25,10 @@ def head_point(det: Detection, conf_min: float) -> tuple[float, float]:
     return (x1 + x2) / 2, y1 + 0.1 * (y2 - y1)
 
 
+def has_head_keypoints(det: Detection, conf_min: float) -> bool:
+    return any(_kp(det, n, conf_min) for n in HEAD_POINTS)
+
+
 def facing_score(det: Detection, conf_min: float) -> float:
     nose = _kp(det, "nose", conf_min)
     if nose is None:
@@ -122,7 +126,8 @@ class FeatureExtractor:
                 distance_source=st["src"], facing_score=score,
                 facing=score >= self.cfg.facing_threshold,
                 motion=classify_motion(list(st["hist"]), self.cfg), confidence=det.score,
-                visible=tr.visible, first_seen=tr.first_seen, last_seen=tr.last_seen))
+                visible=tr.visible, first_seen=tr.first_seen, last_seen=tr.last_seen,
+                head_from_keypoints=has_head_keypoints(det, conf)))
         live = {tr.id for tr in tracks}
         for gone in set(self._state) - live:
             del self._state[gone]

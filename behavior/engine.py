@@ -69,9 +69,12 @@ class Engine:
         second on the robot. A coasting (predicted) target is never chased.
         """
         prev = self._aim_cmd
-        if prev is not None and (not new_frame or not person.visible):
+        # Only aim at a head that was actually seen: a coasting prediction or a head point guessed
+        # from the box top (pinned at the image edge when the face is out of frame) runs away.
+        seen = person.visible and person.head_from_keypoints
+        if prev is not None and (not new_frame or not seen):
             return Command(prev.turn, prev.nod, lean)
-        if not person.visible:                      # nothing to hold yet
+        if not seen:                                # nothing to hold yet
             return Command(base[0], base[1], lean)
         world = (base[0] + person.head_deg[0], base[1] + person.head_deg[1])
         if self._aim is None or self._aim_id != person.id:

@@ -22,6 +22,7 @@ class SimPerson:
     motion: str = "still"
     first_seen: float = -10.0
     yaw_rate: float = 0.0
+    face_visible: bool = True        # False: face out of frame, perception falls back to the box top
 
 
 class SimNeck:
@@ -106,12 +107,15 @@ class SimCamera:
     @staticmethod
     def _see(w, pose, now):
         yaw, pitch = w.yaw - pose[0], w.pitch - pose[1]
+        if not w.face_visible:
+            pitch = VFOV / 2 - 2.0                  # box top clipped at the image edge
         if abs(yaw) > HFOV / 2 or abs(pitch) > VFOV / 2:
             return None
         return Person(id=w.id, box=(0.0, 0.0, 1.0, 1.0), head_px=(0.0, 0.0), head_deg=(yaw, pitch),
                       world_yaw_deg=w.yaw, distance_m=w.distance, distance_source="body",
                       facing_score=w.facing_score, facing=w.facing_score >= 0.6, motion=w.motion,
-                      confidence=0.9, visible=True, first_seen=w.first_seen, last_seen=now)
+                      confidence=0.9, visible=True, first_seen=w.first_seen, last_seen=now,
+                      head_from_keypoints=w.face_visible)
 
 
 class Sim:

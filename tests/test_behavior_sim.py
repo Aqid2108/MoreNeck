@@ -130,3 +130,13 @@ def test_holding_on_a_still_noisy_person_stays_calm(preset):
     sim.run(4.0)
     assert sim.neck.stop_go_rate() < 2.0
     assert abs(sim.turn() - 15.0) < 3.0
+
+
+def test_close_person_with_face_out_of_frame_does_not_drag_the_head_up(preset):
+    p = SimPerson(1, yaw=0.0, pitch=12.0, distance=0.8)
+    sim = Sim(preset, [p])
+    sim.run(3.0)
+    nod_before = sim.neck.pos["nod"]
+    p.face_visible = False                          # box top pinned at the image edge
+    sim.run(4.0)
+    assert sim.neck.pos["nod"] < nod_before + 3.0

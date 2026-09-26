@@ -160,3 +160,11 @@ def test_pose_dropout_does_not_fake_passing(pcfg):
         pose = (40.0, 0.0) if t < 0.67 else None
         (p,) = fx.people([track(frontal(), t=t)], t, (1280, 720), pose=pose)
     assert p.motion in ("still", "unknown")
+
+
+def test_people_report_whether_the_head_point_came_from_keypoints(pcfg):
+    fx = FeatureExtractor(pcfg)
+    (face,) = fx.people([track(frontal(), id_=1)], 0.0, (1280, 720))
+    (back,) = fx.people([track(from_behind(), id_=2)], 0.0, (1280, 720))
+    assert face.head_from_keypoints is True
+    assert back.head_from_keypoints is False      # box-top fallback: not a real head position

@@ -100,3 +100,15 @@ def test_coasting_target_is_never_chased(preset):
     for i in range(1, 10):
         e.tick(coasting, snap(1.0 + i * 0.05, coasting), RUNNING, 1.0 + i * 0.05)
     assert e.command.turn == pytest.approx(10.0)
+
+
+def test_a_head_point_guessed_from_the_box_is_never_chased(preset):
+    # On the robot: face out of frame at 0.8 m, box-top fallback pinned at the image top,
+    # nod ran away to +82 deg.
+    e = Engine(preset)
+    seen = [person(1, pitch=5.0)]
+    e.tick(seen, snap(1.0, seen), RUNNING, 1.0)
+    guessed = [person(1, pitch=15.0, head_from_keypoints=False)]
+    for i in range(1, 40):
+        e.tick(guessed, snap(1.0 + i * 0.05, guessed, pose=(0.0, 5.0, 0.0)), RUNNING, 1.0 + i * 0.05)
+    assert e.command.nod == pytest.approx(5.0, abs=0.1)

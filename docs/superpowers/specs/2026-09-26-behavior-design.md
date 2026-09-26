@@ -99,6 +99,8 @@ chased coasting predictions off the image to its ±60° limit.
 
 - **Aim** = the person's room direction: `pose at capture + camera offset`, updated **once per new
   snapshot**, only while the person is **visible** (coasting predictions are never chased).
+  Only a head point from real head keypoints counts (`Person.head_from_keypoints`): on the robot a
+  box-top fallback pinned at the image edge (face out of frame at 0.8 m) ran nod away to +82°.
   Smoothed across frames: `aim += follow_gain × (measured − aim)`, but only when the difference is
   ≥ `deadband_deg` (3°, ~1.5× the 1.9° measured head-angle noise).
 - **Pursuit:** every 20 Hz tick, a critically damped spring (`pursuit_hz`, 1.0 Hz) moves the
