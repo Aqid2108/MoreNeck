@@ -31,7 +31,7 @@ class SimNeck:
     LIMITS = {"turn": (-60.0, 60.0), "nod": (0.0, 60.0), "lean": (0.0, 30.0)}
     SPEED = {"turn": 120.0, "nod": 30.0, "lean": 20.0}
     ACCEL = {"turn": 200.0, "nod": 300.0, "lean": 150.0}
-    SUBSTEPS = 5
+    SUBSTEPS = 1                      # one step per sim tick: the robot's neck ticks at 50 Hz
 
     def __init__(self):
         self.pos = {"turn": 0.0, "nod": 0.0, "lean": 0.0}
@@ -121,8 +121,13 @@ class SimCamera:
 
 
 class Sim:
-    def __init__(self, preset, people=(), dt=0.05):
+    """Neck and camera advance every 20 ms (the robot's 50 Hz neck loop); the engine ticks at its
+    own preset.loop_hz, as the runner does - a slower engine leaves the neck idle between targets."""
+
+    def __init__(self, preset, people=(), dt=0.02):
         self.engine = Engine(preset)
+        self._engine_period = 1.0 / preset.loop_hz
+        self._next_engine = 0.0
         self.neck = SimNeck()
         self.camera = SimCamera()
         self.people = list(people)
@@ -136,12 +141,14 @@ class Sim:
             for p in self.people:
                 p.yaw += p.yaw_rate * self.dt
             self.camera.step(self.t, self.people, self.neck)
-            shot = self.camera.latest
-            people = people_or_empty(shot, self.t, 0.3)
-            cmd = self.engine.tick(people, shot if shot.source_ok else None,
-                                   NeckStatus(self.neck.running, self.neck.pose()), self.t)
-            if cmd is not None:
-                self.neck.look(cmd.turn, cmd.nod, cmd.lean)
+            if self.t + 1e-9 >= self._next_engine:
+                self._next_engine += self._engine_period
+                shot = self.camera.latest
+                people = people_or_empty(shot, self.t, 0.3)
+                cmd = self.engine.tick(people, shot if shot.source_ok else None,
+                                       NeckStatus(self.neck.running, self.neck.pose()), self.t)
+                if cmd is not None:
+                    self.neck.look(cmd.turn, cmd.nod, cmd.lean)
             self.neck.step(self.dt)
             self.log.append((self.t, self.engine.state, self.neck.pose(), self.engine.attention.target_id))
 

@@ -92,7 +92,7 @@ BBASE = {   # frozen copy of the spec's "calm" preset; tests override what they 
     "lean_deg": 5.0, "avert_after_s": None, "avert_deg": 20.0, "avert_s": 2.0,
     "deadband_deg": 3.0, "lean_near_m": 1.5, "lean_release_m": 1.8, "lean_release_s": 1.0,
     "coast_factor": 0.5, "near_full_m": 1.0, "near_zero_m": 4.0, "newcomer_window_s": 0.5,
-    "loop_hz": 20.0, "pursuit_hz": 1.0,
+    "loop_hz": 50.0, "pursuit_hz": 1.0,
 }
 
 

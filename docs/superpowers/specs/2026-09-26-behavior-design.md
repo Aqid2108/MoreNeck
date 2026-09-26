@@ -142,14 +142,15 @@ Follow gain 0.4 (not 0.3) for calm/shy: a timing model of the loop (19 fps, 60 m
 pose at capture) gave ~10° walking lag at 0.3 vs 7.5° at 0.4, with no overshoot on a still target.
 
 Shared: `deadband_deg 1.5`, `lean_near_m 1.5`, `lean_release_m 1.8`, `lean_release_s 1.0`,
-`coast_factor 0.5`, `near_full_m 1.0`, `near_zero_m 4.0`, `newcomer_window_s 0.5`, `loop_hz 20`.
+`coast_factor 0.5`, `near_full_m 1.0`, `near_zero_m 4.0`, `newcomer_window_s 0.5`, `loop_hz 50` (same rate as the neck loop — at 20 Hz the neck finished each
+small move and stopped between behavior updates: 8.3 vs 1.0 stop-go/s in simulation).
 `avert_after_s: null` disables averting.
 
 ### Runner and CLI
 
 - `behave.py --preset calm [--view] [--dry-run]` runs from **Terminal.app** (camera permission).
 - Starts `Perception` (with `pose_provider = neck.pose`) and `NeckController` (unless `--dry-run`),
-  then a 20 Hz loop: `people_or_empty` → `engine.tick` → `neck.look(*cmd)` only when the command
+  then a 50 Hz loop (matching the neck): `people_or_empty` → `engine.tick` → `neck.look(*cmd)` only when the command
   changes.
 - `--dry-run`: no neck; pose provider returns `None`; the follow base is neutral `(0, 0, 0)` (the head
   really stays there — building on its own last command would wind up); commands are printed (≤ 2/s)

@@ -8,7 +8,7 @@ shared:
   near_full_m: 1.0
   near_zero_m: 4.0
   newcomer_window_s: 0.5
-  loop_hz: 20.0
+  loop_hz: 50.0         # same rate as the neck loop: a slower engine leaves the neck stopping between targets
   pursuit_hz: 1.0        # spring-damper that makes the commanded position glide
   glance_s: 1.0
   glance_cooldown_s: 3.0
