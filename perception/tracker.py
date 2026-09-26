@@ -50,7 +50,14 @@ class Tracker:
         self._tracks: list[Track] = []
         self._next_id = 1
 
-    def update(self, detections: list[Detection], t: float) -> list[Track]:
+    def update(self, detections: list[Detection], t: float,
+               shift_px: tuple[float, float] = (0.0, 0.0)) -> list[Track]:
+        dx, dy = shift_px
+        if dx or dy:   # the head turned: move every track with the image
+            shift = np.array([dx, dy, dx, dy], dtype=float)
+            for tr in self._tracks:
+                tr.last_box = tr.last_box + shift
+                tr.box = tr.box + shift
         preds = [tr.predict(t) for tr in self._tracks]
         matches, unmatched_dets = self._associate(preds, detections)
         matched = set()

@@ -5,10 +5,12 @@ Behavior reads latest() (or uses people_or_empty). No frames are ever written to
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 
 from perception.features import FeatureExtractor
+from perception.geometry import focal_px
 from perception.tracker import Tracker
 from perception.types import Snapshot
 
@@ -41,6 +43,7 @@ class Perception:
         self._last_reopen = 0.0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._prev_pose = None
 
     # ---- lifecycle -------------------------------------------------------
 
@@ -103,7 +106,15 @@ class Perception:
         except Exception as exc:
             self._fail(frame.time, f"detector error: {exc!r}")
             return self.latest()
-        tracks = self.tracker.update(detections, frame.time)
+        shift = (0.0, 0.0)
+        if pose is not None and self._prev_pose is not None:
+            sensor_width = height if self.cfg.rotate in (90, 270) else width
+            f = focal_px(sensor_width, self.cfg.hfov_deg)
+            # turning left moves the scene right in the image; nodding up moves it down
+            shift = (f * math.tan(math.radians(pose[0] - self._prev_pose[0])),
+                     f * math.tan(math.radians(pose[1] - self._prev_pose[1])))
+        self._prev_pose = pose
+        tracks = self.tracker.update(detections, frame.time, shift)
         people = self.features.people(tracks, frame.time, (width, height), pose)
         if self._failing:
             log.info("perception recovered")

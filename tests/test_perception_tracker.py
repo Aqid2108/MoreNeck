@@ -88,3 +88,20 @@ def test_ids_are_never_reused():
             tr.update([], t)
             t += DT
     assert seen == sorted(set(seen))
+
+
+def test_head_rotation_shift_keeps_ids_through_fast_turns():
+    def track_with(shift):
+        tr = Tracker()
+        for i in range(3):
+            tracks = tr.update([det(300, w=60)], i * DT)
+        first = tracks[0].id
+        for i in range(3, 13):                       # the head turns: the person slides 70 px/frame
+            x = 300 + 70 * (i - 2)
+            tracks = tr.update([det(x, w=60)], i * DT, shift_px=(70.0, 0.0) if shift else (0.0, 0.0))
+        return first, tracks
+
+    first, tracks = track_with(shift=True)
+    assert [t.id for t in tracks if t.visible] == [first]
+    first, tracks = track_with(shift=False)          # without compensation the track is lost
+    assert first not in [t.id for t in tracks if t.visible]

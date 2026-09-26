@@ -178,3 +178,20 @@ def test_snapshot_neck_pose_is_none_without_a_provider(pcfg):
     p, _, _, clock, _ = make(pcfg)
     run(p, clock, 1)
     assert p.latest().neck_pose is None
+
+
+def test_pipeline_passes_head_rotation_shift_to_the_tracker(pcfg):
+    import math
+
+    from perception.geometry import focal_px
+
+    p, _, _, clock, _ = make(pcfg)
+    poses = iter([(0.0, 0.0, 0.0), (5.0, 2.0, 0.0)])
+    p.pose_provider = lambda: next(poses)
+    shifts = []
+    original = p.tracker.update
+    p.tracker.update = lambda d, t, shift_px=(0.0, 0.0): shifts.append(shift_px) or original(d, t, shift_px)
+    run(p, clock, 2)
+    f = focal_px(1280, 60.0)
+    assert shifts[0] == (0.0, 0.0)
+    assert shifts[1] == pytest.approx((f * math.tan(math.radians(5.0)), f * math.tan(math.radians(2.0))))
