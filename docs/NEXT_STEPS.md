@@ -90,3 +90,14 @@ Still to do (needs the user's OK or the hardware):
 4. **For the behavior spec:** publish timestamped neck poses so perception can (a) interpolate the pose
    to frame capture time and (b) compensate the tracker for head rotation (review I-4/I-6).
 5. 14 deferred minor review items are listed in the ledger (`Final: minor (deferred)` lines).
+
+### Live results on the head camera (2026-09-26, Terminal.app)
+- Image upright (`rotate: 0`). Live view works; people boxed and labelled.
+- **Camera is the fps ceiling: ~18.8 fps at 1280×720**, regardless of requested fps/MJPG (AVFoundation
+  ignores both). Pipeline keeps up (view shows 18–19 fps). The spec's ≥ 25 fps target is not reachable
+  with this camera; try brighter light (webcams lengthen exposure in dim light) or 640×480 if more is needed.
+- Detector: 7 ms/frame on MPS in a Claude-launched process on a still 720p image, but ~31 ms/frame in the
+  Terminal.app camera loop (≈ CPU speed). Not limiting (fits in the 53 ms frame period) — investigate later
+  (camera thread contention or power management).
+- IDs change when a person leaves the frame for > 1 s — by design (re-identification deferred).
+- Still to report: facing/away label, approaching/leaving, distance reading at a known distance.
