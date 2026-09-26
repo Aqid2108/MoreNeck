@@ -86,6 +86,7 @@ class Engine:
             # the tilt that would line the person up is large - nod climbed to 43-72 deg on the robot).
             turn = min(max(turn, lo), hi)
             nod = self._aim[1] if self._aim is not None and self._aim_id == person.id else base[1]
+        nod = min(nod, self.p.max_nod_deg)     # ceiling: looking up at the ceiling breeds ghosts
         world = (turn, nod)
         if self._aim is None or self._aim_id != person.id:
             aim = world

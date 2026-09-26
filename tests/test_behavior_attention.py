@@ -108,3 +108,9 @@ def test_a_one_frame_confidence_dip_does_not_hand_attention_away(preset):
     att.update([person(1, facing_score=0.9, confidence=0.45), person(2, facing_score=0.5)], 0.05)
     for i in range(2, 40):
         assert att.update([person(1, facing_score=0.9), person(2, facing_score=0.5)], i * 0.05) == 1
+
+
+def test_low_confidence_detections_cannot_become_the_target(preset):
+    att = Attention(preset)                      # min_confidence 0.6
+    assert att.update([person(1, confidence=0.55, facing_score=1.0)], 0.0) is None
+    assert att.update([person(1, confidence=0.65, facing_score=1.0)], 0.1) == 1

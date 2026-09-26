@@ -1,9 +1,6 @@
 """Who to look at: scoring, stickiness with a sustained-lead switch rule, and glances."""
 from __future__ import annotations
 
-MIN_CONFIDENCE = 0.5
-
-
 def closeness(distance_m, preset) -> float:
     if distance_m is None:
         return 0.0
@@ -31,7 +28,7 @@ class Attention:
         self._last_glance_at = float("-inf")
 
     def _eligible(self, people):
-        return [x for x in people if x.confidence >= MIN_CONFIDENCE]
+        return [x for x in people if x.confidence >= self.p.min_confidence]
 
     def update(self, people, now: float) -> int | None:
         eligible = self._eligible(people)

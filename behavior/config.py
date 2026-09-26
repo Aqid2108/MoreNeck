@@ -19,6 +19,8 @@ class Preset:
     switch_hold_s: float
     follow_gain: float
     pursuit_hz: float
+    max_nod_deg: float
+    min_confidence: float
     glance_newcomer: bool
     glance_movement: bool
     glance_s: float
@@ -55,6 +57,8 @@ def _validate(p: Preset) -> None:
         (p.lean_deg >= 0, "lean_deg must be non-negative"),
         (p.avert_after_s is None or p.avert_after_s > 0, "avert_after_s must be null or positive"),
         (0 <= p.coast_factor <= 1, "coast_factor must be within 0..1"),
+        (0 < p.max_nod_deg <= 90, "max_nod_deg must be in (0, 90]"),
+        (0 < p.min_confidence <= 1, "min_confidence must be in (0, 1]"),
         (all(v > 0 for v in (p.switch_hold_s, p.glance_s, p.glance_cooldown_s, p.lost_hold_s,
                              p.scan_after_s, p.scan_amplitude_deg, p.scan_speed_dps, p.scan_pause_s,
                              p.avert_s, p.deadband_deg, p.lean_release_s, p.newcomer_window_s,

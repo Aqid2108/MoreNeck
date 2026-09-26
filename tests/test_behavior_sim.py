@@ -165,3 +165,15 @@ def test_reachable_target_to_the_side_is_centred(preset):
     sim.run(4.0)
     yaw, pitch = world_to_camera(*sim.neck.pose(), world_vector(p.yaw, 15.0))
     assert abs(yaw) < 3.5 and abs(pitch) < 3.5
+
+
+def test_never_looks_higher_than_the_nod_ceiling(preset):
+    # Robot: a close person took nod to ~70 deg, then ceiling "ghosts" drove it to 92 deg.
+    p = SimPerson(1, yaw=0.0, pitch=10.0)
+    sim = Sim(preset, [p])
+    sim.run(2.0)
+    p.pitch = 70.0 - 0.5                         # climbs out of reach over time
+    for _ in range(40):
+        p.pitch = min(80.0, p.pitch + 2.0)
+        sim.run(0.1)
+    assert sim.neck.pos["nod"] <= 45.0 + 0.5
