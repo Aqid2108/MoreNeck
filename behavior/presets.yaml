@@ -32,7 +32,7 @@ presets:
     glance_movement: false
     lost_hold_s: 2.0
     idle_scan: false
-    lean_deg: 10.0
+    lean_deg: 5.0
     avert_after_s: null
   curious:
     w_facing: 1.0

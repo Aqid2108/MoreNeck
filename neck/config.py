@@ -62,9 +62,6 @@ class NeckConfig:
     rest_torque_fraction: float
     rest_timeout_s: float
     limp_after_rest: bool
-    servo_speed_factor: float
-    servo_speed_margin: float
-    servo_acc: int
     joints: dict[str, JointConfig]
 
 
@@ -104,8 +101,6 @@ def config_from_dict(d: dict) -> NeckConfig:
     cfg = NeckConfig(**{k: d[k] for k in top}, joints=joints)
     if cfg.loop_hz <= 0:
         raise ValueError(f"loop_hz must be positive, got {cfg.loop_hz}")
-    if cfg.servo_speed_factor < 1 or cfg.servo_speed_margin < 0 or not 1 <= cfg.servo_acc <= 254:
-        raise ValueError("need servo_speed_factor >= 1, servo_speed_margin >= 0, 1 <= servo_acc <= 254")
     return cfg
 
 

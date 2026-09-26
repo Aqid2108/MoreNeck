@@ -10,7 +10,7 @@ def test_presets_file_has_the_three_presets_from_the_spec():
     presets = load_presets(PRESETS_FILE)
     assert set(presets) == {"calm", "curious", "shy"}
     calm, curious, shy = presets["calm"], presets["curious"], presets["shy"]
-    assert (calm.follow_gain, calm.stickiness, calm.switch_hold_s, calm.lean_deg) == (0.25, 0.6, 1.5, 10.0)
+    assert (calm.follow_gain, calm.stickiness, calm.switch_hold_s, calm.lean_deg) == (0.25, 0.6, 1.5, 5.0)
     assert curious.idle_scan and curious.glance_movement and curious.lean_deg == 10.0
     assert shy.avert_after_s == 4.0 and shy.lean_deg == 0.0 and not shy.glance_newcomer
     assert calm.avert_after_s is None
@@ -48,7 +48,3 @@ def test_missing_and_unknown_keys():
     d["folow_gain"] = 0.3
     with pytest.raises(ValueError, match="unknown.*folow_gain"):
         preset_from_dict("x", d)
-
-
-def test_calm_leans_ten_degrees():
-    assert load_presets(PRESETS_FILE)["calm"].lean_deg == 10.0

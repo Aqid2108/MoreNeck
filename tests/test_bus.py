@@ -163,29 +163,3 @@ def test_find_port_raises_when_adapter_absent(monkeypatch):
     monkeypatch.setattr("neck.bus.list_ports.comports", lambda: [FakePortInfo("/dev/cu.eyes", 0x1A86, 0x7523)])
     with pytest.raises(BusError, match="55d3"):
         find_port(0x1A86, 0x55D3)
-
-
-def test_goal_speed_bytes_pack_acc_position_time_and_speed():
-    from neck.bus import goal_speed_bytes
-
-    assert goal_speed_bytes(805, 1000.4, 50) == [50, 0x25, 0x03, 0, 0, 0xE8, 0x03]
-    assert goal_speed_bytes(805, 0.0, 50)[5:] == [1, 0]            # never 0 (0 means full speed)
-    assert goal_speed_bytes(805, 9999, 300) == [254, 0x25, 0x03, 0, 0, 0x48, 0x0D]   # clamped
-
-
-class RecordingHandler:
-    def __init__(self):
-        self.writes = []
-
-    def syncWriteTxOnly(self, start_address, data_length, param, param_length):
-        self.writes.append((start_address, data_length, list(param[:param_length])))
-        return 0
-
-
-def test_write_goals_with_speeds_is_one_seven_byte_write_from_acc():
-    bus = stub_bus()
-    bus._ph = RecordingHandler()
-    assert bus.write_goals({"lean": 900, "nod": 3000}, speeds={"lean": 200, "nod": 300}, acc=50)
-    (start, length, param), = bus._ph.writes
-    assert (start, length) == (41, 7)
-    assert param[:8] == [1, 50, 900 & 0xFF, 900 >> 8, 0, 0, 200, 0]

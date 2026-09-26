@@ -24,7 +24,6 @@ BASE = {
     "soft_limit_margin_deg": 2.0, "soft_hold_timeout_s": 1.0,
     "rest_speed_deg_s": 15.0, "rest_torque_fraction": 0.5,
     "rest_timeout_s": 10.0, "limp_after_rest": True,
-    "servo_speed_factor": 1.2, "servo_speed_margin": 100.0, "servo_acc": 50,
     "joints": {
         "turn": _joint(4, 1873, 2918, 2286, 2286, 120.0, 400.0),
         "nod": _joint(3, 2744, 3133, 2939, 3150, 90.0, 300.0, rest_tolerance_deg=0.5),
