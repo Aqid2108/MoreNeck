@@ -79,7 +79,8 @@ Any confirmed, eligible person in `LOST`/`IDLE`/`SCANNING` → `TRACKING` (highe
 
 ### Attention (`attention.py`)
 
-- Eligible: `confidence ≥ 0.5`. Coasting (`visible=False`) people score × `coast_factor` (0.5).
+- Eligible to be acquired or to challenge: `confidence ≥ 0.5`. The current target stays while it is
+  present at all (a one-frame confidence dip must not skip the switch hold). Coasting (`visible=False`) people score × `coast_factor` (0.5).
 - `closeness = clamp((near_zero_m − d) / (near_zero_m − near_full_m), 0, 1)` with
   `near_full_m = 1.0`, `near_zero_m = 4.0`; unknown distance → 0.
 - `score = w_facing·facing_score + w_near·closeness + w_approach·[motion == "approaching"]`,
@@ -93,7 +94,8 @@ Any confirmed, eligible person in `LOST`/`IDLE`/`SCANNING` → `TRACKING` (highe
 ### Follow (`follow.py`)
 
 - Runs **once per new snapshot** (by `Snapshot.timestamp`), never re-applying an old offset.
-- Base pose = `Snapshot.neck_pose` (pose at capture); if `None`, the neck's current pose.
+- Base pose = `Snapshot.neck_pose` (pose at capture); if `None`, the neck's current pose; if that is
+  `None` too, neutral.
 - `turn_cmd = base_turn + gain·yaw`, `nod_cmd = base_nod + gain·pitch` (head point); an axis whose
   |offset| < `deadband_deg` (1.5°) keeps its previous command.
 - **Lean:** `lean_deg` when the target is within `lean_near_m` (1.5 m) and facing; back to 0 when
@@ -135,8 +137,9 @@ Shared: `deadband_deg 1.5`, `lean_near_m 1.5`, `lean_release_m 1.8`, `lean_relea
 - Starts `Perception` (with `pose_provider = neck.pose`) and `NeckController` (unless `--dry-run`),
   then a 20 Hz loop: `people_or_empty` → `engine.tick` → `neck.look(*cmd)` only when the command
   changes.
-- `--dry-run`: no neck; pose provider returns `None`; the engine's current pose is its own last
-  command; commands are printed (≤ 2/s) instead of sent.
+- `--dry-run`: no neck; pose provider returns `None`; the follow base is neutral `(0, 0, 0)` (the head
+  really stays there — building on its own last command would wind up); commands are printed (≤ 2/s)
+  instead of sent.
 - `--view`: the perception debug window plus state, target ID, and command; keys `q` quit,
   `c` clear a neck fault (the only way faults are cleared — never automatically).
 - Ctrl-C / `q`: stop perception, `neck.close()` (rests and holds, as configured).

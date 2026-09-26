@@ -52,8 +52,7 @@ class Engine:
             return snapshot.neck_pose
         if neck.pose is not None:
             return neck.pose
-        if self.command is not None:
-            return (self.command.turn, self.command.nod, self.command.lean)
+        # No pose (dry run): the head is really at neutral, so never build on our own commands.
         return (0.0, 0.0, 0.0)
 
     def _follow(self, person, base, new_frame: bool, lean: float) -> Command:

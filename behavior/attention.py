@@ -35,7 +35,9 @@ class Attention:
 
     def update(self, people, now: float) -> int | None:
         eligible = self._eligible(people)
-        by_id = {x.id: x for x in eligible}
+        # The current target stays while it is present at all: the confidence cutoff applies only
+        # to acquiring and challenging, so a one-frame detector dip can't hand attention away.
+        by_id = {x.id: x for x in people}
         if self.target_id not in by_id:
             self.target_id = None
             self._challenger = None

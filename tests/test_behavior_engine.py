@@ -35,13 +35,14 @@ def test_each_snapshot_is_used_once(preset):
     assert e.command == first
 
 
-def test_without_any_pose_the_last_command_is_the_base(preset):
+def test_without_any_pose_the_base_is_neutral_so_dry_run_does_not_wind_up(preset):
+    # In a dry run the head stays at neutral, so the camera offset never shrinks.
     e = Engine(preset)
     p = [person(1, yaw=20.0)]
     dry = NeckStatus(running=True, pose=None)
-    e.tick(p, snap(1.0, p, pose=None), dry, 1.0)
-    cmd = e.tick(p, snap(1.1, p, pose=None), dry, 1.1)
-    assert cmd.turn == pytest.approx(0.4 * 20 + 0.4 * 20)
+    for i in range(10):
+        e.tick(p, snap(1.0 + i * 0.1, p, pose=None), dry, 1.0 + i * 0.1)
+    assert e.command.turn == pytest.approx(0.4 * 20)
 
 
 def test_neck_fault_pauses_and_sends_nothing(preset):

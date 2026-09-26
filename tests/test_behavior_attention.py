@@ -98,3 +98,13 @@ def test_newcomer_glance_disabled(make_preset):
     att = Attention(make_preset({"glance_newcomer": False}))
     att.update([person(1)], 0.0)
     assert att.glance_candidate([person(1), person(2, first_seen=10.0)], 10.1) is None
+
+
+def test_a_one_frame_confidence_dip_does_not_hand_attention_away(preset):
+    # Real detector scores for a turned or partly hidden person hover around 0.4-0.6.
+    att = Attention(preset)
+    att.update([person(1, facing_score=0.9), person(2, facing_score=0.5)], 0.0)
+    assert att.target_id == 1
+    att.update([person(1, facing_score=0.9, confidence=0.45), person(2, facing_score=0.5)], 0.05)
+    for i in range(2, 40):
+        assert att.update([person(1, facing_score=0.9), person(2, facing_score=0.5)], i * 0.05) == 1
