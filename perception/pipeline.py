@@ -108,7 +108,8 @@ class Perception:
         if self._failing:
             log.info("perception recovered")
             self._failing = False
-        snap = Snapshot(frame.time, (width, height), people, True, None)
+        snap = Snapshot(frame.time, (width, height), people, True, None,
+                        tuple(pose) if pose is not None else None)
         self._publish(snap, frame.image)
         return snap
 

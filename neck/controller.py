@@ -180,6 +180,16 @@ class NeckController:
                 "targets": dict(self.targets),
             }
 
+
+    def pose(self) -> tuple[float, float, float] | None:
+        """Current (turn, nod, lean) in degrees from neutral, from measured positions."""
+        with self._lock:
+            try:
+                return tuple(self.cfg.joints[n].to_deg(self.readings[n].position)
+                             for n in ("turn", "nod", "lean"))
+            except (KeyError, AttributeError):   # not started yet, or a servo didn't answer
+                return None
+
     # ---- loop ------------------------------------------------------------
 
     def _run(self) -> None:

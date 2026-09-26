@@ -40,3 +40,4 @@ class Snapshot:
     people: tuple[Person, ...]
     source_ok: bool
     error: str | None = None
+    neck_pose: tuple[float, float, float] | None = None   # (turn, nod, lean) when the frame was read

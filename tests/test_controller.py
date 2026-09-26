@@ -121,3 +121,26 @@ def test_startup_refuses_torque_when_goal_cannot_be_verified(cfg):
     with pytest.raises(BusError, match="goal"):
         ctrl.start(run_thread=False)
     assert bus.torque_log == []
+
+
+def test_pose_is_none_before_start(cfg):
+    ctrl, _, _ = make(cfg)
+    assert ctrl.pose() is None
+
+
+def test_pose_reports_measured_angles_in_degrees(cfg):
+    ctrl, _, clock = make(cfg)
+    ctrl.start(run_thread=False)
+    ctrl.look(turn=20.0)
+    run(ctrl, clock, 2.0)
+    turn, nod, lean = ctrl.pose()
+    assert turn == pytest.approx(20.0, abs=0.3)
+    assert nod == pytest.approx(0.0, abs=0.3) and lean == pytest.approx(0.0, abs=0.3)
+
+
+def test_pose_is_none_when_a_servo_is_silent(cfg):
+    ctrl, bus, clock = make(cfg)
+    ctrl.start(run_thread=False)
+    bus.servos["nod"].responding = False
+    run(ctrl, clock, 0.02)
+    assert ctrl.pose() is None

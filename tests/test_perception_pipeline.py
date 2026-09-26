@@ -165,3 +165,16 @@ def test_neck_pose_is_sampled_before_inference(pcfg):
     p.pose_provider = lambda: order.append("pose") or (0.0, 0.0)
     run(p, clock, 2)
     assert order == ["pose", "detect", "pose", "detect"]
+
+
+def test_snapshot_carries_the_neck_pose_sampled_at_frame_read(pcfg):
+    p, _, _, clock, _ = make(pcfg)
+    p.pose_provider = lambda: (12.0, 3.0, 1.0)
+    run(p, clock, 1)
+    assert p.latest().neck_pose == (12.0, 3.0, 1.0)
+
+
+def test_snapshot_neck_pose_is_none_without_a_provider(pcfg):
+    p, _, _, clock, _ = make(pcfg)
+    run(p, clock, 1)
+    assert p.latest().neck_pose is None
