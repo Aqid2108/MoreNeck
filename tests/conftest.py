@@ -92,7 +92,7 @@ BBASE = {   # frozen copy of the spec's "calm" preset; tests override what they 
     "lean_deg": 5.0, "avert_after_s": None, "avert_deg": 20.0, "avert_s": 2.0,
     "deadband_deg": 3.0, "lean_near_m": 1.5, "lean_release_m": 1.8, "lean_release_s": 1.0,
     "coast_factor": 0.5, "near_full_m": 1.0, "near_zero_m": 4.0, "newcomer_window_s": 0.5,
-    "loop_hz": 50.0, "pursuit_hz": 1.0, "max_nod_deg": 45.0, "min_confidence": 0.6, "low_confidence_drop_s": 0.5, "acquire_max_nod_deg": 25.0,
+    "loop_hz": 50.0, "pursuit_hz": 1.0, "min_move_speed_dps": 10.0, "hop_start_deg": 4.0, "max_nod_deg": 45.0, "min_confidence": 0.6, "low_confidence_drop_s": 0.5, "acquire_max_nod_deg": 25.0,
 }
 
 

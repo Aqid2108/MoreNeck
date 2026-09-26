@@ -109,6 +109,10 @@ chased coasting predictions off the image to its ±60° limit.
   ≥ `deadband_deg` (3°, ~1.5× the 1.9° measured head-angle noise).
 - **Pursuit:** every 20 Hz tick, a critically damped spring (`pursuit_hz`, 1.0 Hz) moves the
   commanded position toward the aim, so the neck receives a gliding target and never stop-starts.
+- **No crawling (hops):** below ~8 °/s the servos stick-slip (4–7 Hz shudder measured on the robot;
+  64% of turn motion was spent there). A pursuit move runs at ≥ `min_move_speed_dps` (10) and lands
+  exactly on the aim; at rest, a new move starts only when the aim is ≥ `hop_start_deg` (4°) away.
+  Slow drifts and noise are followed in brisk hops (simulation: crawl 70% → 4%).
 - **Lean:** `lean_deg` when the target is within `lean_near_m` (1.5 m) and facing; back to 0 when
   beyond `lean_release_m` (1.8 m) or not facing for `lean_release_s` (1.0 s).
 - `neck.look()` clamps to soft limits (nod ≥ 0, lean ≥ 0). Turn acceleration lowered to 200 °/s².

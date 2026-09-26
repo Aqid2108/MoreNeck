@@ -19,6 +19,8 @@ class Preset:
     switch_hold_s: float
     follow_gain: float
     pursuit_hz: float
+    min_move_speed_dps: float
+    hop_start_deg: float
     max_nod_deg: float
     min_confidence: float
     low_confidence_drop_s: float
@@ -60,6 +62,7 @@ def _validate(p: Preset) -> None:
         (p.avert_after_s is None or p.avert_after_s > 0, "avert_after_s must be null or positive"),
         (0 <= p.coast_factor <= 1, "coast_factor must be within 0..1"),
         (0 < p.max_nod_deg <= 90, "max_nod_deg must be in (0, 90]"),
+        (p.min_move_speed_dps > 0 and p.hop_start_deg >= 0, "min_move_speed_dps > 0, hop_start_deg >= 0"),
         (0 < p.min_confidence <= 1, "min_confidence must be in (0, 1]"),
         (p.low_confidence_drop_s > 0, "low_confidence_drop_s must be positive"),
         (0 <= p.acquire_max_nod_deg <= p.max_nod_deg, "acquire_max_nod_deg must be within 0..max_nod_deg"),

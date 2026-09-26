@@ -65,9 +65,9 @@ def test_aim_is_smoothed_across_frames(preset):
     e = Engine(preset)
     first = [person(1, yaw=20.0)]
     e.tick(first, snap(1.0, first, pose=(10.0, 0.0, 0.0)), RUNNING, 1.0)        # aim 30
-    moved = [person(1, yaw=30.0)]
-    cmd = e.tick(moved, snap(1.1, moved, pose=(10.0, 0.0, 0.0)), RUNNING, 1.1)  # measured 40
-    assert e._aim_cmd.turn == pytest.approx(30.0 + 0.25 * 10.0)                 # aim moves part way
+    moved = [person(1, yaw=40.0)]
+    cmd = e.tick(moved, snap(1.1, moved, pose=(10.0, 0.0, 0.0)), RUNNING, 1.1)  # measured 50
+    assert e._aim_cmd.turn == pytest.approx(30.0 + 0.25 * 20.0)                 # aim moves part way
     assert 30.0 < cmd.turn < e._aim_cmd.turn                                     # command glides
 
 

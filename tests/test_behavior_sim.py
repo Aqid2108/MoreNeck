@@ -164,7 +164,7 @@ def test_reachable_target_to_the_side_is_centred(preset):
     p.yaw_rate = 0.0
     sim.run(4.0)
     yaw, pitch = world_to_camera(*sim.neck.pose(), world_vector(p.yaw, 15.0))
-    assert abs(yaw) < 3.5 and abs(pitch) < 3.5
+    assert abs(yaw) < 4.5 and abs(pitch) < 4.5        # re-aims only beyond hop_start_deg (4)
 
 
 def test_never_looks_higher_than_the_nod_ceiling(preset):
@@ -177,3 +177,22 @@ def test_never_looks_higher_than_the_nod_ceiling(preset):
         sim.run(0.1)
     sim.run(2.0)
     assert 40.0 <= sim.neck.pos["nod"] <= 45.0 + 0.5
+
+
+def test_a_slowly_drifting_person_is_followed_in_hops_not_a_crawl(preset):
+    # Robot: 64% of turn's motion was a 0.5-8 deg/s crawl -> 4-7 Hz stick-slip shudder.
+    p = SimPerson(1, yaw=-10.0, yaw_rate=4.0)
+    sim = Sim(preset, [p])
+    sim.camera.noise_deg = 1.9
+    sim.run(8.0)
+    assert sim.neck.crawl_share() < 0.15                 # was ~0.70
+    assert sim.neck.stop_go_rate() < 2.5
+    assert abs(p.yaw - sim.turn()) < 5.0
+
+
+def test_a_still_noisy_person_does_not_make_the_head_crawl(preset):
+    sim = Sim(preset, [SimPerson(1, yaw=15.0)])
+    sim.camera.noise_deg = 1.9
+    sim.run(8.0)
+    assert sim.neck.crawl_share() < 0.15
+    assert abs(sim.turn() - 15.0) < 3.0

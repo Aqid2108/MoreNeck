@@ -58,6 +58,12 @@ class SimNeck:
                                                      self.SPEED[k], self.ACCEL[k], h)
             self.turn_speeds.append((h, self.vel["turn"]))
 
+    def crawl_share(self) -> float:
+        """Share of turning time spent at 0.5-8 deg/s, where the real servos stick-slip (shudder)."""
+        moving = [(h, v) for h, v in self.turn_speeds if abs(v) > 0.5]
+        total = sum(h for h, _ in moving)
+        return sum(h for h, v in moving if abs(v) < 8) / total if total else 0.0
+
     def stop_go_rate(self) -> float:
         """Stop-and-go cycles per second of turning (the jerk measured on the robot: 5.1/s)."""
         cycles, moving, going = 0, 0.0, False

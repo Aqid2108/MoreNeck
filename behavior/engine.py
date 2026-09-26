@@ -110,9 +110,21 @@ class Engine:
             self._x, self._v = [start.turn, start.nod], [0.0, 0.0]
         w = 2 * math.pi * self.p.pursuit_hz
         dt = min(dt, 0.1)
+        v_min = self.p.min_move_speed_dps
         for i, goal in enumerate((cmd.turn, cmd.nod)):
             accel = w * w * (goal - self._x[i]) - 2 * w * self._v[i]
             self._v[i] += accel * dt
+            remaining = goal - self._x[i]
+            if self._v[i] - accel * dt == 0.0 and abs(remaining) < self.p.hop_start_deg:
+                self._v[i] = 0.0                  # at rest: small aim changes don't start a move
+                continue
+            # No crawling: below ~8 deg/s the servos stick-slip (4-7 Hz shudder measured on the
+            # robot, 64% of turn's motion was spent there). A move runs at >= v_min or lands.
+            if abs(remaining) <= v_min * dt:
+                self._x[i], self._v[i] = goal, 0.0
+                continue
+            if abs(self._v[i]) < v_min or self._v[i] * remaining < 0:
+                self._v[i] = math.copysign(v_min, remaining)
             self._x[i] += self._v[i] * dt
         return Command(self._x[0], self._x[1], cmd.lean)
 
