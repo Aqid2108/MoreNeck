@@ -26,7 +26,8 @@ REG_TORQUE_LIMIT = 48          # RAM, 2 bytes, 0-1000 (not defined in st3215.val
 READ_START = STS_PRESENT_POSITION_L   # 0x38
 READ_LEN = 15                  # registers 0x38..0x46
 CURRENT_MA_PER_COUNT = 6.5
-STREAM_ACC = 254               # servo-side ramp effectively off; controller shapes motion
+STREAM_ACC = 250               # firmware maximum (254 reads back as 250): servo-side ramp effectively off
+MIN_STREAM_ACC = 40            # x100 counts/s^2 = ~350 deg/s^2: above every joint's planned acceleration
 STREAM_SPEED = 3400            # servo-side speed cap effectively off
 
 
@@ -182,7 +183,7 @@ class ServoBus:
     def set_torque(self, on: bool) -> bool:
         return self._sync_write(STS_TORQUE_ENABLE, 1, {sid: [1 if on else 0] for sid in self.ids.values()})
 
-    def _write_verified(self, address: int, value: int, two_bytes: bool) -> bool:
+    def _write_verified(self, address: int, value: int, two_bytes: bool, accept=None) -> bool:
         """Acknowledged per-servo write plus read-back. Broadcast settings can be lost silently
         (on the robot, "acceleration 254" never reached nod and it kept an old value)."""
         ok = True
@@ -197,8 +198,9 @@ class ServoBus:
             except SERIAL_ERRORS as exc:
                 log.warning("setting register %d on %s failed: %r", address, name, exc)
                 got, comm = None, -1
-            if comm != COMM_SUCCESS or got != value:
-                log.error("%s: register %d is %s, expected %d", name, address, got, value)
+            good = accept(got) if accept is not None else got == value
+            if comm != COMM_SUCCESS or not good:
+                log.error("%s: register %d is %s after writing %d", name, address, got, value)
                 ok = False
         return ok
 
@@ -207,7 +209,9 @@ class ServoBus:
         return self._write_verified(REG_TORQUE_LIMIT, v, two_bytes=True)
 
     def configure_for_streaming(self) -> bool:
-        acc = self._write_verified(STS_ACC, STREAM_ACC, two_bytes=False)
+        # Nod's firmware reverts acceleration to 50 by itself; anything fast enough is fine.
+        acc = self._write_verified(STS_ACC, STREAM_ACC, two_bytes=False,
+                                   accept=lambda got: got is not None and got >= MIN_STREAM_ACC)
         spd = self._write_verified(STS_GOAL_SPEED_L, STREAM_SPEED, two_bytes=True)
         return acc and spd
 

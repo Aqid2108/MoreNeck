@@ -168,13 +168,16 @@ def test_find_port_raises_when_adapter_absent(monkeypatch):
 class RegisterHandler:
     """Acknowledged per-servo register writes/reads against an in-memory register map."""
 
-    def __init__(self, ids, drop=()):
+    def __init__(self, ids, drop=(), pinned=None):
         self.regs = {sid: {} for sid in ids}
         self.drop = set(drop)            # (sid, address) writes that silently don't take effect
+        self.pinned = pinned or {}       # (sid, address) -> value the servo reverts to
 
     def write1ByteTxRx(self, sid, address, value):
-        if (sid, address) not in self.drop:
-            self.regs[sid][address] = value
+        if (sid, address) in self.pinned:
+            self.regs[sid][address] = self.pinned[(sid, address)]
+        elif (sid, address) not in self.drop:
+            self.regs[sid][address] = min(value, 250) if address == 41 else value   # firmware cap
         return 0, 0
 
     def write2ByteTxRx(self, sid, address, value):
@@ -192,7 +195,16 @@ def test_streaming_settings_are_written_and_verified_per_servo():
     bus._ph = RegisterHandler([1, 3])
     assert bus.configure_for_streaming() is True
     for sid in (1, 3):
-        assert bus._ph.regs[sid][41] == 254 and bus._ph.regs[sid][46] == 3400
+        assert bus._ph.regs[sid][41] == 250 and bus._ph.regs[sid][46] == 3400
+
+
+def test_acceleration_only_needs_to_be_high_enough():
+    # On the robot: firmware caps acceleration at 250, and nod reverts to 50 by itself.
+    bus = stub_bus()
+    bus._ph = RegisterHandler([1, 3], pinned={(3, 41): 50})
+    assert bus.configure_for_streaming() is True
+    bus._ph = RegisterHandler([1, 3], pinned={(3, 41): 10})     # 1000 counts/s^2: too slow
+    assert bus.configure_for_streaming() is False
 
 
 def test_streaming_settings_report_a_servo_that_did_not_take_them():
