@@ -1,6 +1,6 @@
 """Run a scripted motion sequence, log every tick to CSV, and recommend current limits.
 
-Usage: .venv/bin/python tools/log_current.py
+Usage: python tools/log_current.py
 MOVES THE NECK. Be at the robot with a hand on servo power.
 """
 from __future__ import annotations

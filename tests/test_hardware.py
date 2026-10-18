@@ -1,4 +1,4 @@
-"""Hardware tests. Run ONLY on request, user at the robot: .venv/bin/pytest -m hardware -v"""
+"""Hardware tests. Run ONLY on request, user at the robot: pytest -m hardware -v"""
 import pytest
 
 from neck.bus import REG_TORQUE_LIMIT, ServoBus

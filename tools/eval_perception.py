@@ -1,7 +1,7 @@
 """Evaluate perception on a video or image sequence, optionally against MOT ground truth.
 
 Usage:
-  .venv/bin/python tools/eval_perception.py VIDEO [--gt gt.txt] [--fps 30]
+  python tools/eval_perception.py VIDEO [--gt gt.txt] [--fps 30]
 VIDEO can be a file or an image-sequence pattern such as data/MOT17/.../img1/%06d.jpg
 """
 import argparse

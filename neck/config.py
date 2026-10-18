@@ -63,6 +63,7 @@ class NeckConfig:
     rest_timeout_s: float
     limp_after_rest: bool
     joints: dict[str, JointConfig]
+    port: str | None = None   # e.g. "COM6" or "/dev/cu.usbmodem1"; None = find by port_vid/port_pid
 
 
 def _validate_joint(j: JointConfig) -> None:
@@ -97,8 +98,8 @@ def config_from_dict(d: dict) -> NeckConfig:
     ids = [j.id for j in joints.values()]
     if len(set(ids)) != len(ids):
         raise ValueError(f"duplicate servo id in joints: {ids}")
-    top = {f.name for f in fields(NeckConfig)} - {"joints"}
-    cfg = NeckConfig(**{k: d[k] for k in top}, joints=joints)
+    top = {f.name for f in fields(NeckConfig)} - {"joints", "port"}
+    cfg = NeckConfig(**{k: d[k] for k in top}, joints=joints, port=d.get("port"))
     if cfg.loop_hz <= 0:
         raise ValueError(f"loop_hz must be positive, got {cfg.loop_hz}")
     return cfg

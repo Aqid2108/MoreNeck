@@ -1,6 +1,7 @@
 loop_hz: 50
 port_vid: 6790
 port_pid: 21971
+port: null          # found by port_vid/port_pid (CH343, 1A86:55D3); set e.g. COM6 only to force one
 baudrate: 1000000
 voltage_warn_below: 6.8
 voltage_soft_below: 6.5

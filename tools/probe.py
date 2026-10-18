@@ -1,6 +1,6 @@
 """Read-only probe of the servo bus: PING + READ only, never writes.
 
-Usage: .venv/bin/python tools/probe.py
+Usage: python tools/probe.py
 """
 import time
 

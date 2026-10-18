@@ -19,6 +19,16 @@ os.environ.setdefault("YOLO_OFFLINE", "1")
 COCO_INDEX = {name: i for i, name in enumerate(KEYPOINT_NAMES)}   # first 7 COCO keypoints
 
 
+def cpu_threads() -> int:
+    """Torch CPU threads for inference. Torch's default (every core) is slower and jitterier on
+    hybrid laptop CPUs, whose efficiency cores hold the rest back: on a Core Ultra 7 155H, 6 threads
+    gave 64 ms median / 81 ms p95 vs 78-134 / 135 ms with all 16. Override: MORENECK_CPU_THREADS."""
+    env = os.environ.get("MORENECK_CPU_THREADS")
+    if env:
+        return max(1, int(env))
+    return max(1, min(6, (os.cpu_count() or 2) // 2))
+
+
 def detections_from_arrays(boxes, scores, keypoints, score_min: float) -> list[Detection]:
     out = []
     for box, score, kps in zip(np.asarray(boxes), np.asarray(scores), np.asarray(keypoints)):
@@ -42,7 +52,10 @@ class YoloPoseDetector:
         self.model = YOLO(str(path))
         self.imgsz = imgsz
         self.score_min = score_min
+        # Apple GPU on Macs, otherwise CPU (deliberately never CUDA: the same setup on every laptop).
         self.device = device or ("mps" if torch.backends.mps.is_available() else "cpu")
+        if self.device == "cpu":
+            torch.set_num_threads(cpu_threads())
 
     @classmethod
     def from_config(cls, cfg, repo_root) -> "YoloPoseDetector":

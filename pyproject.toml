@@ -7,7 +7,8 @@ name = "moreneck"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "st3215 @ git+https://github.com/Mickael-Roger/python-st3215@143cff5e74453a2fd24e7a3d78aeef644364768a",
+  # Same pinned commit as before, as a zip archive so setup doesn't need git installed.
+  "st3215 @ https://github.com/Mickael-Roger/python-st3215/archive/143cff5e74453a2fd24e7a3d78aeef644364768a.zip",
   "pyserial>=3.5",
   "pyyaml>=6",
   "numpy>=1.26",

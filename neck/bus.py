@@ -6,7 +6,7 @@ transaction and written in one transaction per tick. Never writes EEPROM.
 from __future__ import annotations
 
 import logging
-import termios
+import sys
 from dataclasses import dataclass
 
 import serial
@@ -32,8 +32,14 @@ STREAM_SPEED = 3400            # servo-side speed cap effectively off
 
 
 # pyserial raises SerialException/OSError; on macOS a vanished USB device also raises
-# termios.error (not an OSError subclass) from the library's ser.flush().
-SERIAL_ERRORS = (serial.SerialException, OSError, termios.error)
+# termios.error (not an OSError subclass) from the library's ser.flush(). termios is Unix-only:
+# on Windows a vanished device surfaces as SerialException/OSError, already covered.
+try:
+    import termios
+    _TERMIOS_ERRORS: tuple[type[BaseException], ...] = (termios.error,)
+except ImportError:
+    _TERMIOS_ERRORS = ()
+SERIAL_ERRORS = (serial.SerialException, OSError, *_TERMIOS_ERRORS)
 
 
 class BusError(RuntimeError):
@@ -87,7 +93,12 @@ def find_port(vid: int, pid: int) -> str:
     for p in list_ports.comports():
         if p.vid == vid and p.pid == pid:
             return p.device
-    raise BusError(f"no USB serial device {vid:04x}:{pid:04x}; is the bus adapter plugged in?")
+    hint = ""
+    if sys.platform == "win32":
+        hint = (" On Windows the servo board needs the WCH CH343 driver: it should appear in Device "
+                "Manager under Ports as 'USB-Enhanced-SERIAL CH343 (COMx)'. To force a port, set "
+                "`port: COMx` in neck/config.yaml.")
+    raise BusError(f"no USB serial device {vid:04x}:{pid:04x}; is the bus adapter plugged in?{hint}")
 
 
 class ServoBus:
@@ -105,7 +116,7 @@ class ServoBus:
     @classmethod
     def from_config(cls, cfg) -> "ServoBus":
         return cls({n: j.id for n, j in cfg.joints.items()}, vid=cfg.port_vid, pid=cfg.port_pid,
-                   baudrate=cfg.baudrate)
+                   baudrate=cfg.baudrate, port=getattr(cfg, "port", None))
 
     def open(self) -> None:
         port = self._port or find_port(self._vid, self._pid)

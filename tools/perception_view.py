@@ -1,8 +1,8 @@
 """Live perception debug view. Nothing is saved.
 
 Usage:
-  .venv/bin/python tools/perception_view.py              # head camera
-  .venv/bin/python tools/perception_view.py --video F    # a video file, played in real time
+  python tools/perception_view.py              # head camera
+  python tools/perception_view.py --video F    # a video file, played in real time
 Press q or Esc to quit.
 """
 import argparse
@@ -13,6 +13,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))  # repo root, for `perception`/`tools` when run as a script
 
+import perception  # noqa: E402,F401  (before cv2: sets Windows camera options)
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 

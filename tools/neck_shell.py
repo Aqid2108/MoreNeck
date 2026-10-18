@@ -1,6 +1,6 @@
 """Interactive shell with a running NeckController bound to `neck`. Every tick is logged to logs/shell-*.csv.
 
-Usage: .venv/bin/python tools/neck_shell.py
+Usage: python tools/neck_shell.py
 Try: neck.look(turn=10), neck.state, neck.faults, neck.clear_fault(), neck.rest()
 MOVES THE NECK. Be at the robot with a hand on servo power.
 """
@@ -30,10 +30,12 @@ def main():
         with NeckController(cfg, ServoBus.from_config(cfg), on_tick=log) as neck:
             holder["neck"] = neck
             neck.start()
-            code.interact(banner="`neck` is running. Ctrl-D to rest and exit.", local={"neck": neck})
+            eof_key = "Ctrl-Z then Enter" if sys.platform == "win32" else "Ctrl-D"
+            code.interact(banner=f"`neck` is running. {eof_key} to rest and exit.", local={"neck": neck})
     finally:
         if log.rows:
-            print("tick log saved to", log.save(time.strftime("logs/shell-%Y%m%d-%H%M%S.csv")))
+            repo = Path(__file__).resolve().parent.parent   # logs/ in the repo, whatever the cwd
+            print("tick log saved to", log.save(repo / time.strftime("logs/shell-%Y%m%d-%H%M%S.csv")))
 
 
 if __name__ == "__main__":

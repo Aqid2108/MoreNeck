@@ -56,6 +56,28 @@ def test_find_camera_prefers_usb_id_then_name():
     assert find_camera("FFFF:0000", "Nope", enumerate_fn=lambda: cams) is None
 
 
+def test_find_camera_prefers_media_foundation_on_windows(monkeypatch):
+    # As cv2-enumerate-cameras reports them on Windows: DirectShow (7xx) and MSMF (14xx), backend=0
+    monkeypatch.setattr("perception.sources.sys.platform", "win32")
+    cams = [SimpleNamespace(index=700, name="Laptop", vid=0x0408, pid=0x4036, backend=0),
+            SimpleNamespace(index=701, name="Webcam", vid=0x0C45, pid=0x6366, backend=0),
+            SimpleNamespace(index=1400, name="Laptop", vid=0x0408, pid=0x4036, backend=0),
+            SimpleNamespace(index=1401, name="Webcam", vid=0x0C45, pid=0x6366, backend=0)]
+    assert find_camera("0C45:6366", "Webcam", enumerate_fn=lambda: cams) == 1401
+
+
+def test_directshow_camera_requests_mjpg_after_size(monkeypatch):
+    monkeypatch.setattr("perception.sources.sys.platform", "win32")
+    caps = []
+    src = CameraSource(capture_factory=lambda i: caps.append(FakeCapture(i)) or caps[-1],
+                       find=lambda usb, name: 701)
+    src.open()
+    src.close()
+    props = list(caps[0].props)
+    assert caps[0].props[cv2.CAP_PROP_FOURCC] == cv2.VideoWriter_fourcc(*"MJPG")
+    assert props.index(cv2.CAP_PROP_FOURCC) > props.index(cv2.CAP_PROP_FRAME_HEIGHT)
+
+
 class FakeCapture:
     """Produces numbered frames as fast as read() is called (~1 ms each)."""
 
@@ -139,7 +161,7 @@ class SlowCapture(FakeCapture):
 def test_close_never_releases_a_capture_mid_read_and_reopen_is_isolated():
     caps = []
     src = CameraSource(capture_factory=lambda i: caps.append(SlowCapture(i)) or caps[-1],
-                       find=lambda usb, name: 1, join_timeout_s=0.05)
+                       find=lambda usb, name: 1, join_timeout_s=0.05, first_frame_timeout_s=0)
     src.open()
     time.sleep(0.05)                     # reader is now blocked inside read()
     src.close()                          # join times out

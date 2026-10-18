@@ -1,8 +1,9 @@
 """Run the head: perception -> behavior -> neck.
 
-Usage (from macOS Terminal.app - the only place the camera is accessible):
-  .venv/bin/python tools/behave.py --preset calm --dry-run    # decide, print, don't move
-  .venv/bin/python tools/behave.py --preset calm --view       # move, with a debug window
+Usage (with the venv's python; on Windows just run.bat; on macOS run from Terminal.app, the only
+place the camera is accessible there):
+  python tools/behave.py --preset calm --dry-run    # decide, print, don't move
+  python tools/behave.py --preset calm --view       # move, with a debug window
 Keys in --view: q quit, c clear a neck fault. Ctrl-C quits otherwise; the neck rests and holds.
 """
 import argparse
@@ -24,6 +25,7 @@ def main():
                         help="record every behavior and neck tick to logs/ (no images)")
     args = parser.parse_args()
 
+    import perception  # noqa: F401  (before cv2: sets Windows camera options)
     import cv2
 
     from behavior.config import load_preset

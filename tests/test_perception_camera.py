@@ -1,4 +1,4 @@
-"""Head-camera tests. Run only with the camera plugged in: .venv/bin/pytest -m camera -v"""
+"""Head-camera tests. Run only with the camera plugged in: pytest -m camera -v"""
 import time
 
 import pytest

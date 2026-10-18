@@ -1,6 +1,6 @@
 """Torque-off, hand-move calibration. Writes limits/neutral/rest/direction into neck/config.yaml.
 
-Usage: .venv/bin/python tools/calibrate.py
+Usage: python tools/calibrate.py
 The only bus write is torque OFF (makes the neck limp). HOLD THE HEAD before starting.
 """
 from __future__ import annotations

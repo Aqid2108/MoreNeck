@@ -1,9 +1,14 @@
-import termios
-
 import pytest
 import serial
 
 from neck.bus import BusError, Reading, ServoBus, decode_reading, find_port, goal_bytes
+
+try:
+    import termios
+except ImportError:          # Windows
+    termios = None
+
+needs_termios = pytest.mark.skipif(termios is None, reason="termios is Unix-only")
 
 
 def packet(position=805, speed=0, load=0, voltage=74, temp=27, status=0, moving=0,
@@ -114,6 +119,7 @@ def test_read_all_discards_stale_input_bytes_first():
     assert bus._port_handler.ser.input_resets == 1
 
 
+@needs_termios
 def test_read_all_returns_none_on_termios_error():
     # macOS raises termios.error (not OSError) from tcdrain when the USB device is gone
     bus = stub_bus()
@@ -136,10 +142,18 @@ class StubHandler:
         return 0, -6, 0
 
 
+@needs_termios
 def test_write_goals_returns_false_on_termios_error():
     bus = stub_bus()
     bus._ph = StubHandler(raise_exc=termios.error(6, "Device not configured"))
     assert bus.write_goals({"lean": 900}) is False
+
+
+def test_read_all_returns_none_on_windows_unplug_error():
+    # Windows reports a vanished USB serial device as SerialException (ClearCommError failed)
+    bus = stub_bus()
+    bus._reader.raise_exc = serial.SerialException("ClearCommError failed (PermissionError(13))")
+    assert bus.read_all() == {"lean": None, "nod": None}
 
 
 def test_read_goals_reads_goal_register_per_servo():

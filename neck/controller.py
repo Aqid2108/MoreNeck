@@ -8,6 +8,7 @@ from __future__ import annotations
 import atexit
 import logging
 import math
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -35,6 +36,29 @@ class Fault:
     level: Level
     reasons: list[str]
     readings: dict = field(repr=False)
+
+
+def _windows_timer_period(begin: bool) -> bool:
+    """Ask Windows for 1 ms timer resolution (per process since Windows 10 2004). Without it a
+    thread wait rounds up to the 15.6 ms system tick and the 50 Hz loop stutters. No-op elsewhere."""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    try:
+        winmm = ctypes.windll.winmm
+        return (winmm.timeBeginPeriod if begin else winmm.timeEndPeriod)(1) == 0
+    except (OSError, AttributeError):
+        log.warning("could not set Windows timer resolution; neck loop timing may jitter")
+        return False
+
+
+def _check_clock() -> None:
+    res = time.get_clock_info("monotonic").resolution
+    if res > 0.002:
+        # Python < 3.13 on Windows: GetTickCount64, 15.6 ms steps.
+        log.warning("time.monotonic() resolution is %.1f ms; use Python 3.13+ on Windows for "
+                    "accurate timing", res * 1000)
 
 
 def _reason_keys(reasons: list[str]) -> frozenset:
@@ -66,6 +90,7 @@ class NeckController:
         self._closed = False
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._timer_period_set = False
 
     # ---- lifecycle -------------------------------------------------------
 
@@ -82,6 +107,8 @@ class NeckController:
         self._startup()
         atexit.register(self.close)
         if run_thread:
+            _check_clock()
+            self._timer_period_set = _windows_timer_period(True)
             self._thread = threading.Thread(target=self._run, name="neck-loop", daemon=True)
             self._thread.start()
 
@@ -129,6 +156,9 @@ class NeckController:
             self._stop.set()
             if self._thread is not None:
                 self._thread.join(timeout=1.0)
+            if self._timer_period_set:
+                _windows_timer_period(False)
+                self._timer_period_set = False
             if self._opened:
                 self.bus.close()
 

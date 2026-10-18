@@ -1,7 +1,7 @@
 # Perception configuration. See docs/superpowers/specs/2026-09-26-perception-design.md
 camera_usb_id: "0C45:6366"     # head camera (Sonix "Webcam"); matched before the name
 camera_name: Webcam
-camera_index_fallback: null   # set an index only to force a specific camera; index 0 is usually the MacBook's
+camera_index_fallback: null   # set an index only to force a specific camera; index 0 is usually the laptop's own
 width: 1280
 height: 720
 rotate: 0                      # 0, 90, 180 or 270 degrees clockwise
