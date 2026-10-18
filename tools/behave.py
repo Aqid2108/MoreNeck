@@ -78,6 +78,9 @@ def main():
             if args.view:
                 loop = threading.Thread(target=runner.run, args=(stop,), daemon=True)
                 loop.start()
+                shown = False
+                print("Camera window: q or Esc (window focused) or its X button quits; "
+                      "Ctrl-C here also quits. The neck rests first.")
                 while True:
                     snap, img = latest["snap"], latest["img"]
                     if snap is not None and img is not None:
@@ -85,8 +88,12 @@ def main():
                         cv2.putText(frame, f"[{preset.name}] {runner.status_line()}", (10, 74),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
                         cv2.imshow("behave", frame)
+                        shown = True
                     key = cv2.waitKey(20) & 0xFF
                     if key in (ord("q"), 27):
+                        break
+                    # Closed with its X button: quit (imshow would otherwise just reopen it).
+                    if shown and cv2.getWindowProperty("behave", cv2.WND_PROP_VISIBLE) < 1:
                         break
                     if key == ord("c"):
                         runner.clear_fault()
