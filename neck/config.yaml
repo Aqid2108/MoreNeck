@@ -36,6 +36,9 @@ joints:
     temp_soft_c: 60
     temp_hard_c: 65
   nod:
+    # 1:147 gearing (fast, lightly damped): it reproduces sharp accel/brake profiles exactly, which
+    # looked snappy at 300 deg/s^2. 120 ramps to 30 deg/s over 0.25 s. Encoder is on the output
+    # shaft, so positions/limits don't depend on the ratio.
     id: 3
     raw_min: 1991
     raw_max: 3122
@@ -44,7 +47,7 @@ joints:
     rest_tolerance_deg: 3.0
     direction: -1
     max_speed: 30.0
-    max_accel: 300.0
+    max_accel: 120.0
     current_limit_ma: 500
     hold_current_limit_ma: 250
     temp_warn_c: 55
