@@ -1,5 +1,11 @@
 # MoreNeck
 
+> **Original project by [Simon Tan (@simontanmk)](https://github.com/simontanmk):
+> [simontanmk/MoreNeck](https://github.com/simontanmk/MoreNeck).** Simon designed and built
+> MoreNeck: the neck controller, perception, behavior engine, tools and docs. This repository is a
+> Windows port of his work (branch `windows-port`); his original branches `master` and `behavior`
+> are kept unchanged.
+
 A robot head that looks at people. Three Feetech STS3215 bus servos (lean, nod, turn) move a
 head with a USB camera; a pose model finds people and a behavior engine decides who to look at
 and how to move.
@@ -73,7 +79,15 @@ writes per-tick logs to `logs/`.
 Neck control and perception are done; behavior is in hardware tuning on the `behavior` branch.
 Eye displays (ESP32) are planned.
 
+## Credits
+
+- **[Simon Tan (@simontanmk)](https://github.com/simontanmk)**: creator of MoreNeck and author of
+  the original code, design specs and plans
+  ([simontanmk/MoreNeck](https://github.com/simontanmk/MoreNeck)).
+- **[@Aqid2108](https://github.com/Aqid2108)**: Windows port (`setup.bat` / `run.bat`, CPU-only
+  setup, Windows serial, camera and timing fixes) and nod tuning for its 1:147 servo.
+
 ## License
 
-MIT — see [LICENSE](LICENSE). The optional `vision` extra installs Ultralytics, which is
-licensed separately under AGPL-3.0.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Simon Tan. The optional `vision` extra installs
+Ultralytics, which is licensed separately under AGPL-3.0.
